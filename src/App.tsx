@@ -19,7 +19,12 @@ const App = () => (
       <BrowserRouter>
         <div className="flex h-screen overflow-hidden">
           <Sidebar />
-          <main className="flex-1 overflow-auto bg-background">
+          {/*
+            Main content area with responsive padding for mobile hamburger menu
+            Mobile: pt-16 to account for fixed hamburger button (44px)
+            Desktop (md+): no additional padding needed as sidebar is fixed
+          */}
+          <main className="flex-1 overflow-auto bg-background pt-16 md:pt-0">
             <Routes>
               <Route path="/" element={<Navigate to="/kanban" replace />} />
               <Route path="/kanban" element={<KanbanPage />} />
