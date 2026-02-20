@@ -14,7 +14,112 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cards: {
+        Row: {
+          criado_em: string
+          data_entrada_etapa: string
+          etapa: string
+          id: string
+          lead_id: string
+        }
+        Insert: {
+          criado_em?: string
+          data_entrada_etapa?: string
+          etapa?: string
+          id?: string
+          lead_id: string
+        }
+        Update: {
+          criado_em?: string
+          data_entrada_etapa?: string
+          etapa?: string
+          id?: string
+          lead_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cards_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          criado_em: string
+          email: string | null
+          empresa: string
+          id: string
+          nome: string
+          observacoes: string | null
+          origem: string | null
+          quantidade_imoveis: number | null
+          telefone: string | null
+          tipo_cliente: string
+          valor_estimado_contrato: number | null
+        }
+        Insert: {
+          criado_em?: string
+          email?: string | null
+          empresa: string
+          id?: string
+          nome: string
+          observacoes?: string | null
+          origem?: string | null
+          quantidade_imoveis?: number | null
+          telefone?: string | null
+          tipo_cliente: string
+          valor_estimado_contrato?: number | null
+        }
+        Update: {
+          criado_em?: string
+          email?: string | null
+          empresa?: string
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          origem?: string | null
+          quantidade_imoveis?: number | null
+          telefone?: string | null
+          tipo_cliente?: string
+          valor_estimado_contrato?: number | null
+        }
+        Relationships: []
+      }
+      movimentacoes: {
+        Row: {
+          card_id: string
+          criado_em: string
+          etapa_anterior: string
+          etapa_nova: string
+          id: string
+        }
+        Insert: {
+          card_id: string
+          criado_em?: string
+          etapa_anterior: string
+          etapa_nova: string
+          id?: string
+        }
+        Update: {
+          card_id?: string
+          criado_em?: string
+          etapa_anterior?: string
+          etapa_nova?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimentacoes_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
