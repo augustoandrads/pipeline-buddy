@@ -43,21 +43,23 @@ export default function LeadsPage() {
 
   const createLead = useMutation({
     mutationFn: async (values: Omit<Lead, "id" | "criado_em">) => {
-      // 1. Create lead
-      const { data: lead, error: leadError } = await supabase
-        .from("leads")
-        .insert(values)
-        .select()
-        .single();
-      if (leadError) throw leadError;
+      // Use atomic function to create lead + card in single transaction
+      const { data, error } = await supabase.rpc("create_lead_with_card", {
+        p_name: values.nome,
+        p_email: values.email || null,
+        p_company: values.empresa,
+        p_tipo_cliente: values.tipo_cliente,
+        p_telefone: values.telefone || null,
+        p_quantidade_imoveis: values.quantidade_imoveis || null,
+        p_valor_estimado_contrato: values.valor_estimado_contrato || null,
+        p_origem: values.origem || null,
+        p_observacoes: values.observacoes || null,
+      });
 
-      // 2. Create card in first stage
-      const { error: cardError } = await supabase
-        .from("cards")
-        .insert({ lead_id: lead.id, etapa: "REUNIAO_REALIZADA" });
-      if (cardError) throw cardError;
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("Failed to create lead");
 
-      return lead;
+      return data[0];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
@@ -65,8 +67,13 @@ export default function LeadsPage() {
       setModalOpen(false);
       toast({ title: "Lead cadastrado e adicionado ao Kanban!" });
     },
-    onError: () => {
-      toast({ title: "Erro ao cadastrar lead", variant: "destructive" });
+    onError: (error) => {
+      const errorMsg = error instanceof Error ? error.message : "Erro desconhecido";
+      if (errorMsg.includes("unique")) {
+        toast({ title: "Este e-mail já foi cadastrado", variant: "destructive" });
+      } else {
+        toast({ title: `Erro ao cadastrar lead: ${errorMsg}`, variant: "destructive" });
+      }
     },
   });
 

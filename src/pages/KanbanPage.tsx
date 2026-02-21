@@ -15,8 +15,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, Etapa, ETAPAS } from "@/types/crm";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCard } from "@/components/KanbanCard";
+import { KanbanSkeleton } from "@/components/KanbanSkeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
 
 export default function KanbanPage() {
   const queryClient = useQueryClient();
@@ -85,8 +85,14 @@ export default function KanbanPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="flex h-full flex-col">
+        <div className="flex items-center justify-between border-b bg-card px-6 py-4">
+          <div>
+            <h1 className="text-lg font-semibold">Pipeline Comercial</h1>
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          </div>
+        </div>
+        <KanbanSkeleton />
       </div>
     );
   }
