@@ -1,0 +1,1544 @@
+# BROWNFIELD DISCOVERY EPICS
+# Phase 10 — Epic Creation & Orchestration
+# Generated: 2026-02-20
+# Status: Ready for Story Generation (@sm) → Implementation (@dev) → QA (@qa) → Push (@devops)
+
+---
+
+meta:
+  project: "pipeline-buddy"
+  phase: "Phase 10 — Epic Creation"
+  lead: "@pm"
+  date: "2026-02-20"
+  consolidated_from: "TECHNICAL-DEBT-ASSESSMENT.md"
+  total_debt_items: 26
+  total_epics: 5
+  total_stories: 22
+  total_effort_hours: "115-130h"
+  estimated_timeline: "6-8 weeks (1 dev) or 4-6 weeks (2 devs)"
+  dependencies:
+    - TECHNICAL-DEBT-ASSESSMENT.md
+    - TECHNICAL-DEBT-REPORT.md
+
+---
+
+epics:
+  - epic_id: "EPIC-DB-HARDENING"
+    title: "Database Hardening & Data Integrity"
+    description: |
+      Establish solid data foundation: performance indexes, atomic operations, constraints,
+      user attribution, and soft delete architecture for compliance and multi-user safety.
+
+      **Impact:** Prevents data corruption, enables multi-user, 10-100x query performance
+      **Business Value:** Foundation for team expansion; compliance-ready; production-safe
+
+    lead: "@data-engineer"
+    collaborators: ["@dev", "@qa"]
+    priority: "CRITICAL"
+    timeline_sprints: ["1.0", "1.5", "2", "3"]
+    capacity_recommendation: "1.5 devs (database focus) + 0.5 devs (integration testing)"
+    total_effort_hours: "18-22h"
+
+    acceptance_criteria:
+      - "All CRITICAL database issues (SEC-001, SEC-002) resolved"
+      - "All HIGH data integrity issues (DB-001, DB-002, DB-003) resolved"
+      - "MEDIUM denormalization + temporal logic validated (DB-004, DB-005, SEC-003)"
+      - "Soft delete architecture designed and ready (DB-006)"
+      - "PostgreSQL ENUM types migrated (DB-007)"
+      - "Integration tests passing (100% coverage on new logic)"
+      - "Staging environment validated before production"
+
+    pre_conditions:
+      - "Backup of production database complete"
+      - "Database schema audit (DB-AUDIT.md) reviewed"
+      - "RLS policies understood (single-user permissive by design, acceptable for MVP)"
+
+    post_conditions:
+      - "Database can safely support multi-user features"
+      - "Audit trail ready for GDPR/LGPD compliance"
+      - "Performance indexes in place for 10,000+ record scale"
+
+    stories:
+      - story_id: "STORY-DB-001"
+        title: "Add Performance Indexes on Hot Query Paths"
+        description: |
+          Create 5 critical database indexes on frequently-queried columns to improve query
+          performance from O(n) to O(log n). Current state: sequential scan on cards, leads,
+          movimentacoes. Impact at scale (1000+ records): queries timeout (>1s).
+
+        acceptance_criteria:
+          - "5 indexes created: idx_cards_data_entrada_etapa, idx_cards_etapa, idx_cards_etapa_date (composite), idx_movimentacoes_criado_em, idx_leads_tipo_cliente"
+          - "Query plans verified (using EXPLAIN ANALYZE)"
+          - "Performance benchmark: typical queries <10ms (was 100-500ms)"
+          - "No data corruption from index creation"
+          - "Indexes created in staging first, validated 2 weeks before production"
+
+        effort_hours: 1
+        priority: "CRITICAL"
+        sprint: "1.0"
+        assigned_to: "@data-engineer"
+        dependencies: []
+
+        tasks:
+          - "Run cardinality analysis on leads, cards, movimentacoes (expect clean data)"
+          - "Create migration file for indexes with IF NOT EXISTS"
+          - "Test index creation on staging database"
+          - "Run EXPLAIN ANALYZE on queries before/after"
+          - "Benchmark query performance (must show 10-100x improvement)"
+          - "Document index maintenance (reindex schedule)"
+
+        qa_criteria:
+          - "Query plans show index usage (no sequential scan)"
+          - "SELECT performance <10ms for typical queries"
+          - "No performance regression on INSERT/UPDATE (indexes add overhead to writes, expect <5% slowdown)"
+
+      - story_id: "STORY-DB-002"
+        title: "Atomic Lead+Card Creation (Race Condition Fix)"
+        description: |
+          Implement PostgreSQL function for atomic lead+card creation. Current issue:
+          lead INSERT succeeds but card INSERT fails → orphaned lead (data corruption).
+          Multi-user scenario: concurrent creates race condition. Solution: database function
+          with transaction boundary.
+
+        acceptance_criteria:
+          - "PostgreSQL function create_lead_with_initial_card() created"
+          - "Function parameters: nome, email, telefone, tipo_cliente, etc."
+          - "Atomic transaction: both inserts succeed or both rollback"
+          - "Returns: {lead_id, card_id} or error"
+          - "App code updated to call function instead of separate INSERTs"
+          - "Integration tests: simulate network timeout, permission error, success path"
+          - "Load test: 100 concurrent creates, zero orphaned records"
+
+        effort_hours: 3
+        priority: "CRITICAL"
+        sprint: "1.5"
+        assigned_to: "@data-engineer"
+        dependencies: ["STORY-DB-001"]
+        notes: "Depends on indexes from Sprint 1.0 to ensure database is stable. Stagger rollout: 10% → 50% → 100% (canary deployment)."
+
+        tasks:
+          - "Write PostgreSQL function with error handling"
+          - "Test function in isolation (success + failure cases)"
+          - "Update LeadsPage API call to use RPC function"
+          - "Write integration test with timeout simulation"
+          - "Load test with k6 or Apache JMeter (100 concurrent creates)"
+          - "Document rollback procedure (keep old code path if needed)"
+          - "Plan canary rollout (10% users first 1 day, then 50%, then 100%)"
+
+        qa_criteria:
+          - "Database function tested and isolated (passes all test cases)"
+          - "App integration test passing (lead + card created together)"
+          - "Load test passing (zero orphaned records under 100 concurrent creates)"
+          - "Rollback plan documented and practiced"
+
+      - story_id: "STORY-DB-003"
+        title: "Add Data Integrity Constraints (Validation, Uniqueness, Ranges)"
+        description: |
+          Add CHECK constraints to prevent invalid data: ensure valid etapa values,
+          lead-card 1:1 relationship, positive quantities/prices, email uniqueness.
+          Current impact: invalid data can corrupt reports and logic.
+
+        acceptance_criteria:
+          - "CHECK constraint on movimentacoes.etapa_anterior and etapa_nova (valid values only)"
+          - "UNIQUE constraint on cards.lead_id (one card per lead)"
+          - "CHECK constraints on quantidade_imoveis > 0, valor_estimado_contrato > 0"
+          - "UNIQUE constraint on leads.email (with partial index for soft-deleted)"
+          - "Pre-check queries confirm no existing data violates constraints"
+          - "Staging test passes (constraint triggers correctly)"
+          - "Production migration succeeds without errors"
+
+        effort_hours: 4
+        priority: "HIGH"
+        sprint: "1.0"
+        assigned_to: "@data-engineer"
+        dependencies: []
+
+        tasks:
+          - "Query for existing constraint violations (etapa, lead_ids, negative values)"
+          - "Remediate any bad data found"
+          - "Create migration file with constraints"
+          - "Test constraints on staging (try insert valid/invalid data)"
+          - "Deploy to production during low-traffic window"
+
+        qa_criteria:
+          - "INSERT with invalid etapa fails with constraint violation error"
+          - "INSERT with duplicate lead_id fails"
+          - "INSERT with quantity ≤ 0 fails"
+          - "No existing data was lost during migration"
+
+      - story_id: "STORY-DB-004"
+        title: "Add Temporal Logic Validation (Stage Entry Timestamps)"
+        description: |
+          Prevent impossible future dates in data_entrada_etapa. Currently: can set stage
+          entry to tomorrow, next month, etc. (logically inconsistent). Add CHECK constraint
+          with reasonable buffer for timezone edge cases.
+
+        acceptance_criteria:
+          - "CHECK constraint: data_entrada_etapa ≤ now() + INTERVAL '24 hours'"
+          - "Allows edge cases (timezone differences, clock skew)"
+          - "Triggers on INSERT and UPDATE"
+          - "No existing data violates constraint"
+
+        effort_hours: 1
+        priority: "HIGH"
+        sprint: "2"
+        assigned_to: "@data-engineer"
+        dependencies: ["STORY-DB-003"]
+
+        tasks:
+          - "Review data_entrada_etapa values (check for future dates)"
+          - "Create migration with temporal constraint"
+          - "Test constraint on staging"
+
+        qa_criteria:
+          - "INSERT with future date fails"
+          - "INSERT with past date succeeds"
+          - "No data lost during migration"
+
+      - story_id: "STORY-DB-005"
+        title: "User Attribution & Audit Trail (GDPR/LGPD Prep)"
+        description: |
+          Add created_by, updated_by, updated_at columns to leads, cards, movimentacoes.
+          Enable GDPR/LGPD compliance: "who did what when". Implement triggers for
+          automatic updated_at and updated_by on every modification.
+
+        acceptance_criteria:
+          - "created_by (UUID) added to leads, cards, movimentacoes"
+          - "updated_by (UUID) added to leads, cards, movimentacoes"
+          - "updated_at (TIMESTAMP) added to leads, cards, movimentacoes"
+          - "Trigger set_updated_at and set_updated_by fires on UPDATE"
+          - "App code sets created_by on INSERT"
+          - "Integration test: verify triggers fire, timestamps updated"
+          - "GDPR/LGPD audit trail complete (can trace all changes to user)"
+
+        effort_hours: 3
+        priority: "HIGH"
+        sprint: "2"
+        assigned_to: "@data-engineer"
+        dependencies: ["STORY-DB-003"]
+
+        tasks:
+          - "Add columns: created_by, updated_by, updated_at to migrations"
+          - "Create trigger functions for automatic updated_at/updated_by"
+          - "Update app: set created_by on lead/card creation"
+          - "Write integration test (create → update → verify timestamps and users)"
+
+        qa_criteria:
+          - "Triggers fire on every UPDATE (verify with test queries)"
+          - "created_by and updated_by populated correctly"
+          - "updated_at automatically set"
+          - "No data lost during schema changes"
+
+      - story_id: "STORY-DB-006"
+        title: "Denormalization Validation Trigger (Audit Log Consistency)"
+        description: |
+          movimentacoes.etapa_anterior is denormalized (derivable from card history) but kept
+          for audit clarity. Add trigger to validate etapa_anterior matches previous transition;
+          raise exception if inconsistent. Prevents silent audit log corruption.
+
+        acceptance_criteria:
+          - "Trigger function validate_movimentacao() created"
+          - "Fires on INSERT to movimentacoes"
+          - "Verifies etapa_anterior matches previous card transition"
+          - "Raises exception if inconsistent (prevents INSERT)"
+          - "Integration test: insert valid/invalid transitions"
+
+        effort_hours: 2
+        priority: "MEDIUM"
+        sprint: "2"
+        assigned_to: "@data-engineer"
+        dependencies: ["STORY-DB-003", "STORY-DB-005"]
+
+        tasks:
+          - "Design trigger logic: query previous transition, compare etapa_anterior"
+          - "Write trigger function in PostgreSQL"
+          - "Test trigger (insert valid + invalid transitions)"
+          - "Benchmark trigger overhead (expect <1ms per insert)"
+
+        qa_criteria:
+          - "INSERT with matching etapa_anterior succeeds"
+          - "INSERT with mismatched etapa_anterior fails with exception"
+          - "No performance regression on movimentacoes INSERT"
+
+      - story_id: "STORY-DB-007"
+        title: "Design Soft Delete Architecture (Data Recovery & GDPR)"
+        description: |
+          Design (not implement yet) soft delete strategy: add deleted_at TIMESTAMP to leads,
+          cards, movimentacoes. Create RLS policy to hide soft-deleted. Document admin role
+          for recovery. Decide retention policy (30 days = GDPR, 1 year = business standard).
+
+        acceptance_criteria:
+          - "deleted_at column design documented"
+          - "RLS policy design: SELECT WHERE deleted_at IS NULL"
+          - "Admin role design (can see soft-deleted) documented"
+          - "Data retention policy decision: 30 days or 1 year?"
+          - "Migration strategy documented (ready for Sprint 4 implementation)"
+          - "Soft delete architecture review approved by @architect"
+
+        effort_hours: 4
+        priority: "MEDIUM"
+        sprint: "3"
+        assigned_to: "@data-engineer"
+        dependencies: ["STORY-DB-005", "STORY-DB-006"]
+        notes: "Design only, implementation deferred to post-MVP (Sprint 4) unless GDPR/LGPD critical path."
+
+        tasks:
+          - "Document deleted_at column schema"
+          - "Design RLS policy: user queries hide soft-deleted, admin sees all"
+          - "Design admin recovery UI (stretch goal)"
+          - "Decide retention policy with stakeholders"
+          - "Document migration strategy (timestamps, constraints)"
+          - "Get architect approval on design"
+
+        qa_criteria:
+          - "Design document complete and approved"
+          - "RLS policy design reviewed by @architect"
+          - "Retention policy decision documented"
+          - "Ready for implementation handoff"
+
+      - story_id: "STORY-DB-008"
+        title: "PostgreSQL ENUM Type Migration (Type Safety)"
+        description: |
+          Migrate tipo_cliente and etapa from TEXT to PostgreSQL ENUM types. Current:
+          magic strings, no schema validation. Migration: create ENUM types, migrate columns,
+          update app code. HIGH RISK: ENUM migration cannot be rolled back easily.
+
+        acceptance_criteria:
+          - "tipo_cliente_enum created: IMOBILIARIA, CONSTRUTORA, CORRETOR"
+          - "etapa_enum created: REUNIAO_REALIZADA, PROPOSTA_ENVIADA, etc."
+          - "leads.tipo_cliente migrated from TEXT to tipo_cliente_enum"
+          - "cards.etapa migrated from TEXT to etapa_enum"
+          - "movimentacoes.etapa_anterior/etapa_nova migrated to etapa_enum"
+          - "Staging tested 2 weeks minimum before production"
+          - "Backup taken before migration"
+          - "Rollback plan: fallback TEXT columns available (just in case)"
+
+        effort_hours: 2
+        priority: "MEDIUM"
+        sprint: "3"
+        assigned_to: "@data-engineer"
+        dependencies: ["STORY-DB-005", "STORY-DB-006"]
+        notes: "HIGH RISK: Test extensively in staging. Consider keeping TEXT columns as fallback initially."
+
+        tasks:
+          - "Define ENUM values precisely (no typos)"
+          - "Create ENUM types in staging"
+          - "Test migration on staging copy of production data"
+          - "Write rollback procedure (fallback to TEXT)"
+          - "Schedule production migration during maintenance window"
+          - "Update app code to use ENUM values"
+          - "Backup production before migration"
+
+        qa_criteria:
+          - "Staging migration successful (no data loss)"
+          - "All queries work with ENUM types"
+          - "App code updated and tested"
+          - "Rollback tested (fallback to TEXT works)"
+
+      - story_id: "STORY-DB-009"
+        title: "Database Integration Testing & Validation"
+        description: |
+          Comprehensive testing: verify all database changes work together. Test user
+          attribution workflow, race condition fix, constraints, triggers, soft delete strategy.
+          Run full integration suite before declaring database hardening complete.
+
+        acceptance_criteria:
+          - "All database changes integrated (constraints + triggers + indexes)"
+          - "Integration test suite passes (100% of database functions)"
+          - "User attribution workflow tested (created_by set + triggers working)"
+          - "Race condition fix verified (no orphaned records under load)"
+          - "WCAG audit on frontend database integration (if applicable)"
+          - "No regressions from database changes"
+
+        effort_hours: 2
+        priority: "HIGH"
+        sprint: "3"
+        assigned_to: "@qa"
+        dependencies: ["STORY-DB-001", "STORY-DB-002", "STORY-DB-003", "STORY-DB-004", "STORY-DB-005", "STORY-DB-006", "STORY-DB-008"]
+        notes: "Final validation before marking database hardening epic complete."
+
+        tasks:
+          - "Write integration tests covering all database changes"
+          - "Run full test suite (expect 100% pass)"
+          - "Load test (100 concurrent operations)"
+          - "Data consistency check (no corruption, all constraints respected)"
+          - "Performance regression test (compare before/after)"
+
+        qa_criteria:
+          - "All integration tests passing"
+          - "Load test: zero errors under 100 concurrent operations"
+          - "No data consistency issues found"
+          - "Performance improved or stable (not degraded)"
+
+---
+
+  - epic_id: "EPIC-MOBILE-RESPONSIVE"
+    title: "Mobile & Responsive Design"
+    description: |
+      Make pipeline-buddy usable on phones and tablets. Current state: 60% of traffic on mobile,
+      app completely unusable. Implement responsive sidebar, mobile table/card view,
+      Kanban mobile optimization. Target: fully functional on 320px-1920px screens.
+
+      **Impact:** Unlocks 60% of user base; mobile market revenue
+      **Business Value:** Deblocks mobile launch; competitive parity
+
+    lead: "@dev"
+    collaborators: ["@ux-design-expert", "@qa"]
+    priority: "CRITICAL"
+    timeline_sprints: ["1.0", "2"]
+    capacity_recommendation: "1 dev (frontend focus) + 0.5 UX design"
+    total_effort_hours: "38-42h"
+
+    acceptance_criteria:
+      - "Sidebar responsive on all screen sizes (320px-1920px)"
+      - "Hamburger menu working on mobile (<768px)"
+      - "Leads table functional as card view on mobile"
+      - "Kanban board navigable on mobile/tablet"
+      - "All interactions (drag-drop, edit, delete) work on mobile"
+      - "Screenshot regression test passing (no desktop regressions)"
+      - "Cross-browser tested (Chrome, Safari, Firefox on mobile devices)"
+
+    pre_conditions:
+      - "Mobile table/Kanban design approved by @ux-design-expert (Figma mockup)"
+      - "Database hardening stable (Sprint 1.0 complete)"
+
+    post_conditions:
+      - "App usable on mobile for all core workflows"
+      - "Mobile users can perform: view leads, edit leads, move cards, view reports"
+
+    stories:
+      - story_id: "STORY-FE-001"
+        title: "Responsive Sidebar Navigation (Mobile Drawer)"
+        description: |
+          Refactor sidebar: desktop shows fixed 240px sidebar, mobile (<768px) shows collapsible
+          drawer (hamburger menu). Main content should fill remaining width on mobile (was: only
+          80px available). Implementation: use shadcn/ui Sheet component for mobile drawer.
+
+        acceptance_criteria:
+          - "Desktop (1024px+): Fixed sidebar (240px) visible always"
+          - "Tablet (768px-1024px): Sidebar collapses to hamburger on demand"
+          - "Mobile (<768px): Drawer menu on hamburger click"
+          - "Main content fills available width on all screen sizes"
+          - "All navigation links functional in drawer"
+          - "No desktop layout regression (screenshot test)"
+          - "Keyboard accessible: Tab to hamburger, Enter to open drawer"
+
+        effort_hours: 10
+        priority: "CRITICAL"
+        sprint: "1.0"
+        assigned_to: "@dev"
+        dependencies: []
+        notes: "BLOCKER for all other mobile work. FE-002, FE-003, FE-004 depend on this."
+
+        tasks:
+          - "Refactor App.tsx layout: replace fixed sidebar with responsive logic"
+          - "Implement Sheet component for mobile drawer"
+          - "Add hamburger menu toggle on mobile (<768px breakpoint)"
+          - "Update layout: main content uses flex-1 (fill available space)"
+          - "Test breakpoints: 320px, 768px, 1024px, 1920px"
+          - "Cross-browser test: Chrome, Safari, Firefox"
+          - "Test on real devices: iPhone 12, Galaxy S21"
+          - "Screenshot regression test (desktop unchanged)"
+          - "Accessibility test: Tab to hamburger, keyboard-only navigation"
+
+        qa_criteria:
+          - "Mobile sidebar drawer opens/closes correctly"
+          - "Navigation links work in drawer"
+          - "Main content visible and usable on mobile (320px+)"
+          - "Desktop layout unchanged (regression test pass)"
+          - "Keyboard navigation working (WCAG 2.1.1)"
+
+      - story_id: "STORY-FE-002"
+        title: "Leads Table — Responsive Card View (Mobile)"
+        description: |
+          Leads page currently shows 7-column table. On mobile: requires horizontal scroll,
+          hard to read. Solution: mobile shows card view (name, email, type, status),
+          desktop shows table. Conditional rendering based on viewport width.
+
+        acceptance_criteria:
+          - "Mobile (<768px): Card view layout (name, email, type, status)"
+          - "Desktop (1024px+): Table view (7 columns: name, email, phone, type, quantity, value, actions)"
+          - "Tablet (768px-1024px): Sticky first column, horizontal scroll enabled"
+          - "Card view: tap to expand (show full details) or edit in modal"
+          - "Table view: all current interactions (edit, delete, filter) work"
+          - "Data accuracy: same data in both views (no info loss)"
+          - "Mobile card design approved by @ux-design-expert"
+
+        effort_hours: 12
+        priority: "HIGH"
+        sprint: "2"
+        assigned_to: "@dev"
+        dependencies: ["STORY-FE-001"]
+        notes: "Requires design mockup approval before implementation. Risk: design discovery (12h → 16h possible if major changes needed)."
+
+        pre_requirements:
+          - "Figma mockup: mobile card layout approved"
+          - "UX decision: tap-to-expand vs. inline details"
+
+        tasks:
+          - "Design mobile card component: LeadCard (name, email, type, status)"
+          - "Implement conditional rendering: isMobile ? <CardGrid /> : <Table />"
+          - "Create responsive breakpoints (320px, 768px, 1024px, 1920px)"
+          - "Implement card view: map over leads, render LeadCard"
+          - "Implement edit/delete actions in card view (modal or inline)"
+          - "Test data accuracy: all fields visible in both views"
+          - "Test interactions: edit, delete, filter work in both views"
+          - "Mobile device testing: iPhone 12, Galaxy S21"
+          - "Screenshot regression: desktop table unchanged"
+
+        qa_criteria:
+          - "Card view displays all essential info (name, email, type, status)"
+          - "Edit/delete actions work in card view"
+          - "Table view unchanged (regression test pass)"
+          - "Data accuracy: no info loss between views"
+          - "Mobile device test: usable on real phones"
+
+      - story_id: "STORY-FE-003"
+        title: "Kanban Board Mobile Optimization (Stage Switcher)"
+        description: |
+          Kanban board shows 5 columns (stages) at ~280px each = 1400px total. On mobile:
+          requires horizontal scroll (bad UX). Solution: mobile shows 1 column + stage selector
+          (dropdown or drawer), tablet shows 3 columns, desktop shows all 5. Implement stage
+          switcher component.
+
+        acceptance_criteria:
+          - "Mobile (<768px): 1 column + stage selector (dropdown or drawer)"
+          - "Tablet (768px-1024px): 3 columns + scroll"
+          - "Desktop (1024px+): All 5 columns, no scroll"
+          - "Stage selector: list of all stages, can switch instantly"
+          - "Visual indicator: show which stage currently displayed"
+          - "Drag-and-drop still works: move cards within visible column"
+          - "Cards move to new stage correctly"
+
+        effort_hours: 4
+        priority: "HIGH"
+        sprint: "2"
+        assigned_to: "@dev"
+        dependencies: ["STORY-FE-001", "STORY-DB-001"]
+        notes: "Design implementation, no data logic. Risk: LOW."
+
+        tasks:
+          - "Design MobileStageSelector component (dropdown or drawer)"
+          - "Implement conditional rendering: mobile shows 1 column + selector, tablet shows 3, desktop shows 5"
+          - "Implement stage switching: click stage in selector → show only that stage"
+          - "Add visual indicator: badge showing current stage"
+          - "Test drag-and-drop still works within selected stage"
+          - "Test cards move to correct stage when dragged"
+          - "Mobile testing: verify selector works on small screens"
+          - "Performance: verify no lag when switching stages"
+
+        qa_criteria:
+          - "Stage selector opens/closes correctly"
+          - "Stage switching instant (no lag)"
+          - "Drag-and-drop works within selected stage"
+          - "Cards move to correct stage"
+          - "Mobile usability: selector easy to tap"
+
+      - story_id: "STORY-FE-004"
+        title: "Mobile Table & Kanban — Additional UX Enhancements"
+        description: |
+          Final responsive design enhancements: truncated text tooltips, modal sizing for mobile,
+          scroll indicators, loading/empty/error states. Make mobile experience polished.
+
+        acceptance_criteria:
+          - "Truncated text: tooltip shows full content (hover on desktop, tap on mobile)"
+          - "Modal max-width: responsive (max-w-lg on desktop, full-width - 32px on mobile)"
+          - "Scroll indicators: visual chevron showing more content available"
+          - "Loading state: skeleton components for leads, cards, kanban"
+          - "Empty state: "No leads yet" message with action (create lead button)"
+          - "Error state: toast + retry button on load failure"
+          - "All new states keyboard accessible (WCAG 2.1)"
+
+        effort_hours: 6
+        priority: "MEDIUM"
+        sprint: "2"
+        assigned_to: "@dev"
+        dependencies: ["STORY-FE-002", "STORY-FE-003"]
+
+        tasks:
+          - "Add Tooltip component to truncated text (KanbanCard titles, company names)"
+          - "Update Modal max-width: responsive sizing"
+          - "Implement Skeleton component for loading states"
+          - "Create EmptyState component for empty lists"
+          - "Create ErrorBoundary for React errors"
+          - "Implement error toast + retry button"
+          - "Add scroll indicators (chevron icons) for scrollable areas"
+          - "Test all new states on mobile devices"
+          - "Accessibility test: keyboard navigation in all states"
+
+        qa_criteria:
+          - "Tooltips appear and hide correctly"
+          - "Modal sizing correct on all breakpoints"
+          - "Loading/empty/error states render correctly"
+          - "Keyboard accessible in all states"
+          - "Mobile testing: all UX enhancements work on phones"
+
+---
+
+  - epic_id: "EPIC-ACCESSIBILITY"
+    title: "Accessibility & WCAG Compliance"
+    description: |
+      Achieve WCAG 2.1 AA compliance (95%+). Current state: 49% compliant. Address all CRITICAL
+      (keyboard drag-drop) and HIGH (aria-labels, focus indicators) accessibility issues.
+      Enable screen reader support, keyboard-only navigation, 15-20% of users with disabilities.
+
+      **Impact:** Legal compliance (ADA), 15-20% new users with disabilities, WCAG audit-ready
+      **Business Value:** Reduces legal risk ($10K-50K fines), expands market, improves brand
+
+    lead: "@dev"
+    collaborators: ["@qa", "@ux-design-expert"]
+    priority: "CRITICAL"
+    timeline_sprints: ["1.0", "2", "3"]
+    capacity_recommendation: "1 dev + 0.5 QA (accessibility testing)"
+    total_effort_hours: "28-32h"
+
+    acceptance_criteria:
+      - "Drag-and-drop keyboard accessible (arrow keys, enter/space to drag)"
+      - "All interactive elements have aria-labels"
+      - "Focus indicators visible on all interactive elements"
+      - "Keyboard navigation: Tab order logical, no focus traps"
+      - "Screen reader support: all elements properly announced"
+      - "WCAG 2.1 AA 95%+ compliant (automated audit + manual verification)"
+      - "Accessibility audit report generated and documented"
+
+    pre_conditions:
+      - "Database hardening stable (indexes, constraints in place)"
+      - "Mobile sidebar responsive (FE-001 complete, not blocking accessibility work)"
+
+    post_conditions:
+      - "Product WCAG audit-ready"
+      - "No accessibility-based legal exposure"
+      - "15-20% user population with disabilities can use app"
+
+    stories:
+      - story_id: "STORY-ACC-001"
+        title: "Drag-and-Drop Keyboard Accessibility"
+        description: |
+          dnd-kit configured but KeyboardSensor not enabled. Drag-and-drop only works with
+          mouse (WCAG 2.1.1 violation). Solution: enable KeyboardSensor, implement arrow key
+          handlers (↑↓ within column, ←→ between columns), test Tab+Enter/Space to activate.
+
+        acceptance_criteria:
+          - "KeyboardSensor added to @dnd-kit configuration"
+          - "sortableKeyboardCoordinates configured correctly"
+          - "Arrow key handlers: ↑↓ move within column, ←→ move between columns"
+          - "Tab: keyboard focus on draggable cards"
+          - "Space/Enter: activate drag mode"
+          - "Escape: cancel drag"
+          - "Integration test: simulate all keyboard inputs, verify card moves"
+          - "Mouse drag-and-drop still works (pointer sensor preserved)"
+          - "Tested on screen reader (NVDA, JAWS, VoiceOver)"
+
+        effort_hours: 6
+        priority: "CRITICAL"
+        sprint: "1.0"
+        assigned_to: "@dev"
+        dependencies: []
+        notes: "@dnd-kit has good docs, but configuration gotchas possible. Research KeyboardSensor beforehand."
+
+        tasks:
+          - "Research @dnd-kit KeyboardSensor configuration"
+          - "Add KeyboardSensor to DnD context"
+          - "Implement arrow key handlers in card components"
+          - "Add Space/Enter handlers to activate drag"
+          - "Add Escape handler to cancel drag"
+          - "Write integration test (keyboard inputs → card moves)"
+          - "Load test (verify no performance regression)"
+          - "Screen reader testing (NVDA, JAWS, VoiceOver)"
+          - "Cross-browser test (Chrome, Firefox, Safari)"
+
+        qa_criteria:
+          - "Tab + Enter/Space activates drag"
+          - "Arrow keys move card within column"
+          - "Shift+Arrow (or ←→) moves between columns"
+          - "Escape cancels drag"
+          - "Mouse drag still works"
+          - "Screen reader announces drag actions"
+
+      - story_id: "STORY-ACC-002"
+        title: "Add aria-labels & Semantic HTML"
+        description: |
+          Interactive elements missing aria-labels: icon-only buttons, draggable cards,
+          action menus. Screen readers cannot understand purpose. Solution: audit all
+          interactive elements, add aria-label/aria-describedby, convert divs to semantic
+          tags where applicable.
+
+        acceptance_criteria:
+          - "All icon-only buttons have aria-label"
+          - "Draggable cards have aria-label (e.g., 'Drag to move: Lead name')"
+          - "Action buttons (edit, delete, etc.) have aria-label"
+          - "Filter buttons have aria-label"
+          - "Modal dialogs have aria-label"
+          - "Semantic HTML: button, input, select, etc. used correctly (not div roleplay)"
+          - "Tested with screen reader: all elements announced correctly"
+          - "axe DevTools audit: 0 accessibility errors"
+
+        effort_hours: 6
+        priority: "HIGH"
+        sprint: "1.0"
+        assigned_to: "@dev"
+        dependencies: []
+
+        tasks:
+          - "Audit codebase for all interactive elements"
+          - "List all icon-only buttons needing aria-label"
+          - "Add aria-label to buttons, icon components, action menus"
+          - "Add aria-description for complex patterns (card transitions)"
+          - "Replace non-semantic divs with proper HTML (button, input, select)"
+          - "Test with screen reader (NVDA, JAWS, VoiceOver)"
+          - "Run axe DevTools audit"
+          - "Document all aria additions in code comments"
+
+        qa_criteria:
+          - "Screen reader announces all interactive elements correctly"
+          - "axe audit shows 0 accessibility errors"
+          - "No semantic HTML regressions (valid HTML5)"
+
+      - story_id: "STORY-ACC-003"
+        title: "Visible Focus Indicators (Keyboard Navigation)"
+        description: |
+          Tab through app: many elements have no visible focus ring. Keyboard-only users
+          cannot see which element has focus (WCAG 2.4.7 violation). Solution: add
+          focus-visible:ring-2 to all interactive elements, test CSS specificity conflicts.
+
+        acceptance_criteria:
+          - "All buttons have focus-visible:ring-2 style"
+          - "All links have focus-visible:ring-2"
+          - "All inputs have focus-visible:ring-2"
+          - "Custom components (KanbanCard, LeadCard) have focus indicators"
+          - "Focus ring color: sufficient contrast ratio (4.5:1 minimum)"
+          - "Focus ring visible on all interactive elements when Tab key pressed"
+          - "No CSS specificity conflicts (focus style not overridden)"
+          - "Desktop: visible, not intrusive"
+          - "Mobile: visible, not too large (clickable area sufficient)"
+
+        effort_hours: 2
+        priority: "HIGH"
+        sprint: "1.0"
+        assigned_to: "@dev"
+        dependencies: []
+
+        tasks:
+          - "Add focus-visible:ring-2 to all interactive components"
+          - "Test CSS specificity: verify ring is not overridden"
+          - "Test focus color contrast: 4.5:1 minimum"
+          - "Tab through entire app on desktop and mobile"
+          - "Screenshot test: verify ring visible on all elements"
+          - "Accessibility test: WCAG 2.4.7 compliance"
+
+        qa_criteria:
+          - "Focus ring visible on Tab navigation"
+          - "Ring color sufficient contrast"
+          - "No CSS conflicts"
+          - "Mobile: ring still visible, not too large"
+
+      - story_id: "STORY-ACC-004"
+        title: "Skip Navigation Link & Language Declaration"
+        description: |
+          Keyboard users must tab through 3 nav items before reaching content (inefficient).
+          Add skip navigation link to jump directly to main content. Also missing: lang="pt-BR"
+          on <html> (screen readers use wrong language pronunciation).
+
+        acceptance_criteria:
+          - "Skip navigation link present (first focusable element)"
+          - "Link text: 'Skip to main content'"
+          - "sr-only class on link (hidden visually, visible to screen readers)"
+          - "focus:not-sr-only on link (visible when Tab focused)"
+          - "Link href=#main-content points to main content area id"
+          - "Main content area has id='main-content'"
+          - "Clicking link focuses main content"
+          - "lang='pt-BR' on <html> element"
+          - "Screen reader test: Portuguese pronunciation correct"
+
+        effort_hours: 1
+        priority: "HIGH"
+        sprint: "1.0"
+        assigned_to: "@dev"
+        dependencies: []
+
+        tasks:
+          - "Add skip navigation link at top of App.tsx"
+          - "Add sr-only + focus:not-sr-only styling"
+          - "Create main content wrapper with id='main-content'"
+          - "Add lang='pt-BR' to index.html <html> tag"
+          - "Test skip link (Tab → link visible → click → focus main content)"
+          - "Screen reader test: language pronunciation"
+
+        qa_criteria:
+          - "Skip link appears on Tab (first element)"
+          - "Skip link hidden visually"
+          - "Click skip link → focus main content"
+          - "Screen reader: Portuguese pronunciation correct"
+
+      - story_id: "STORY-ACC-005"
+        title: "Keyboard Navigation & Focus Management Testing"
+        description: |
+          Comprehensive keyboard navigation test: Tab order logical, no focus traps,
+          all functionality accessible via keyboard. Dialog focus management verified
+          (cannot Tab outside modal). Tested on screen reader (keyboard-only workflow).
+
+        acceptance_criteria:
+          - "Tab order logical throughout app"
+          - "No focus traps (cannot Tab out of modal/dropdown)"
+          - "Shift+Tab (backwards) works correctly"
+          - "Modal: focus traps correctly, cannot Tab outside"
+          - "Modal: first input has autoFocus if needed"
+          - "All functionality accessible via keyboard only (no mouse required)"
+          - "Screen reader test: all interactive elements reachable"
+          - "Keyboard-only test pass (complete user workflow using only keyboard)"
+
+        effort_hours: 4
+        priority: "HIGH"
+        sprint: "2"
+        assigned_to: "@qa"
+        dependencies: ["STORY-ACC-001", "STORY-ACC-002", "STORY-ACC-003", "STORY-ACC-004"]
+
+        tasks:
+          - "Tab through entire app, log tab order"
+          - "Verify tab order makes sense (logical flow)"
+          - "Test modal: verify focus trap (Tab stays within modal)"
+          - "Test modal: Escape key closes modal, focus returns to trigger"
+          - "Test dropdown: Tab through options, Escape closes"
+          - "Screen reader test: all elements announced"
+          - "Keyboard-only workflow test: create lead → move card → edit → delete (all via keyboard)"
+          - "Document any focus management issues found"
+
+        qa_criteria:
+          - "Tab order logical"
+          - "No focus traps (except modals, which should trap)"
+          - "Modal focus management correct"
+          - "All functionality accessible via keyboard only"
+
+      - story_id: "STORY-ACC-006"
+        title: "WCAG 2.1 AA Compliance Audit & Documentation"
+        description: |
+          Final accessibility audit: run automated tools (axe, WAVE, Lighthouse), manual
+          keyboard/screen reader testing, document findings. Target: 95% WCAG AA compliance.
+          Document remaining gaps (5% acceptable, deferred to post-launch if minor).
+
+        acceptance_criteria:
+          - "Automated audit: axe, WAVE, Lighthouse run"
+          - "Accessibility issues categorized: CRITICAL, HIGH, MEDIUM, LOW"
+          - "All CRITICAL/HIGH issues resolved"
+          - "95%+ WCAG AA criteria compliance"
+          - "Manual testing: keyboard navigation, screen reader"
+          - "Accessibility audit report generated (findings + recommendations)"
+          - "Remaining gaps documented (defer to Q2 if <5% and LOW severity)"
+          - "Product WCAG audit-ready"
+
+        effort_hours: 4
+        priority: "HIGH"
+        sprint: "3"
+        assigned_to: "@qa"
+        dependencies: ["STORY-ACC-001", "STORY-ACC-002", "STORY-ACC-003", "STORY-ACC-004", "STORY-ACC-005"]
+
+        tasks:
+          - "Run axe DevTools automation (all pages)"
+          - "Run WAVE browser extension (all pages)"
+          - "Run Lighthouse accessibility audit"
+          - "Compile findings: categorize by severity"
+          - "Manual testing: keyboard-only navigation (all pages)"
+          - "Manual testing: screen reader (NVDA, JAWS, VoiceOver)"
+          - "Create accessibility audit report (findings + remediation)"
+          - "Document remaining gaps and remediation timeline"
+          - "Get sign-off from @qa (accessibility gate)"
+
+        qa_criteria:
+          - "Audit report complete"
+          - "95%+ WCAG AA compliance confirmed"
+          - "All CRITICAL/HIGH issues resolved"
+          - "Remaining gaps (if any) documented with timeline"
+
+---
+
+  - epic_id: "EPIC-PERFORMANCE-DEVOPS"
+    title: "Performance & DevOps Infrastructure"
+    description: |
+      Optimize performance: code splitting, lazy loading, monitoring. Setup CI/CD pipeline:
+      GitHub Actions for lint, test, build. Add error tracking (Sentry). Prepare for
+      production deployment with monitoring and alerts.
+
+      **Impact:** Faster load times, automated quality gates, production observability
+      **Business Value:** Better UX (faster), fewer surprises in production, enterprise-ready
+
+    lead: "@dev"
+    collaborators: ["@devops", "@qa"]
+    priority: "MEDIUM"
+    timeline_sprints: ["2", "3", "4"]
+    capacity_recommendation: "1 dev (frontend performance) + 0.5 devops"
+    total_effort_hours: "20-24h"
+
+    acceptance_criteria:
+      - "Code splitting: routes lazy-loaded with React.lazy()"
+      - "Bundle size: <100KB gzipped (was 130KB)"
+      - "Initial page load (FCP): <3s on 4G"
+      - "Recharts lazy loaded (heavy library)"
+      - "GitHub Actions CI/CD pipeline active"
+      - "Lint + typecheck + test + build run automatically on all commits"
+      - "Performance monitoring (Web Vitals) active"
+      - "Error tracking (Sentry) configured and alerts working"
+
+    pre_conditions:
+      - "App stable (accessibility + mobile work mostly complete)"
+      - "Database hardening complete (Sprint 3)"
+
+    post_conditions:
+      - "Product production-ready with observability"
+      - "Zero downtime deployments possible"
+      - "Can detect and respond to issues in real-time"
+
+    stories:
+      - story_id: "STORY-PERF-001"
+        title: "Code Splitting & Route-Based Lazy Loading"
+        description: |
+          All pages (Kanban, Leads, Relatórios) bundled together. Solution: wrap pages with
+          React.lazy(), use Suspense boundaries. Load pages only when user navigates to them.
+          Target: 15-20% faster initial page load, <100KB gzipped bundle.
+
+        acceptance_criteria:
+          - "KanbanPage, LeadsPage, RelatoriosPage wrapped with React.lazy()"
+          - "Suspense boundaries with Skeleton fallback"
+          - "Bundle size: <100KB gzipped (was 130KB)"
+          - "Initial page load FCP: <3s on 4G"
+          - "Route transitions smooth (Skeleton shows while loading)"
+          - "Lighthouse performance score: >85"
+          - "No route loading failures"
+
+        effort_hours: 4
+        priority: "MEDIUM"
+        sprint: "3"
+        assigned_to: "@dev"
+        dependencies: ["STORY-FE-002", "STORY-FE-003"]
+
+        tasks:
+          - "Identify page components to lazy load (Kanban, Leads, Relatórios)"
+          - "Wrap components with React.lazy()"
+          - "Create Suspense boundaries with Skeleton fallback"
+          - "Test route transitions (load page → verify Skeleton shows → page loads)"
+          - "Measure bundle size: webpack-bundle-analyzer"
+          - "Benchmark FCP with Lighthouse"
+          - "Test on slow network (4G throttling in DevTools)"
+          - "Verify no regressions in route navigation"
+
+        qa_criteria:
+          - "Bundle size <100KB gzipped"
+          - "FCP <3s on 4G"
+          - "Lighthouse score >85"
+          - "Route transitions work correctly"
+
+      - story_id: "STORY-PERF-002"
+        title: "Lazy Load Heavy Libraries (Recharts)"
+        description: |
+          Recharts imported globally but only used on Relatórios page. Current: bundled for
+          all users even if never visit Relatórios. Solution: import Recharts only in
+          RelatoriosPage component. Saves ~15-20KB from initial bundle.
+
+        acceptance_criteria:
+          - "Recharts import moved from global imports to RelatoriosPage only"
+          - "Tree-shaking verified (unused Recharts code removed from bundle)"
+          - "Bundle size reduction: ~15-20KB"
+          - "Relatórios page still loads and renders charts correctly"
+          - "No performance regression on other pages"
+
+        effort_hours: 2
+        priority: "MEDIUM"
+        sprint: "3"
+        assigned_to: "@dev"
+        dependencies: ["STORY-PERF-001"]
+
+        tasks:
+          - "Remove global Recharts import"
+          - "Add import to RelatoriosPage component"
+          - "Verify Recharts tree-shaking (webpack-bundle-analyzer)"
+          - "Test RelatoriosPage (charts render correctly)"
+          - "Benchmark bundle size before/after"
+          - "Test other pages (no performance regression)"
+
+        qa_criteria:
+          - "Bundle size reduction: ~15-20KB"
+          - "Recharts still works on RelatoriosPage"
+          - "No regressions on other pages"
+
+      - story_id: "STORY-PERF-003"
+        title: "Performance Monitoring & Web Vitals Tracking"
+        description: |
+          Setup Web Vitals tracking (Largest Contentful Paint, First Input Delay, Cumulative
+          Layout Shift). Monitor performance over time with Sentry or Datadog. Set performance
+          budget: <100KB gzipped. Get alerts if budget exceeded or Core Web Vitals degraded.
+
+        acceptance_criteria:
+          - "Web Vitals tracking active (LCP, FID, CLS)"
+          - "Performance data sent to Sentry or Datadog"
+          - "Performance dashboard visible (can see metrics over time)"
+          - "Performance budget: <100KB gzipped"
+          - "Alert if bundle exceeds budget"
+          - "Alert if Core Web Vitals degrade"
+          - "Baseline metrics documented (for comparison)"
+
+        effort_hours: 4
+        priority: "MEDIUM"
+        sprint: "3"
+        assigned_to: "@dev"
+        dependencies: ["STORY-PERF-001", "STORY-PERF-002"]
+
+        tasks:
+          - "Setup web-vitals library"
+          - "Send Web Vitals to Sentry (or Datadog)"
+          - "Create performance dashboard in Sentry"
+          - "Configure performance budget in CI (fail build if >100KB)"
+          - "Setup alerts: bundle size, Core Web Vitals"
+          - "Document baseline metrics"
+          - "Test alert triggering (simulate large bundle)"
+
+        qa_criteria:
+          - "Web Vitals tracked and visible in dashboard"
+          - "Performance budget enforced in CI"
+          - "Alerts configured and tested"
+
+      - story_id: "STORY-DEVOPS-001"
+        title: "GitHub Actions CI/CD Pipeline"
+        description: |
+          Currently: no CI/CD. New commits not automatically tested. Solution: GitHub Actions
+          workflow: lint → typecheck → test → build. Fail deployment if any check fails.
+          Add staging deployment.
+
+        acceptance_criteria:
+          - "GitHub Actions workflow created (.github/workflows/ci.yml)"
+          - "Workflow triggers on all commits (push to any branch)"
+          - "Steps: npm run lint, npm run typecheck, npm test, npm run build"
+          - "Build succeeds or workflow fails"
+          - "Status badge visible on README"
+          - "PR checks block merge if CI fails"
+          - "Deployment to staging on successful build"
+          - "All developers must pass CI before merging"
+
+        effort_hours: 4
+        priority: "MEDIUM"
+        sprint: "4"
+        assigned_to: "@devops"
+        dependencies: ["STORY-PERF-001"]
+        notes: "@devops exclusive (git push authority). Set up staging deployment."
+
+        tasks:
+          - "Create .github/workflows/ci.yml"
+          - "Add lint step (npm run lint)"
+          - "Add typecheck step (npm run typecheck)"
+          - "Add test step (npm test)"
+          - "Add build step (npm run build)"
+          - "Configure PR checks (require passing CI)"
+          - "Setup staging deployment (if using Vercel or similar)"
+          - "Add status badge to README"
+          - "Test workflow (push change, verify CI runs)"
+
+        qa_criteria:
+          - "CI runs on all commits"
+          - "Workflow fails if lint/typecheck/test/build fail"
+          - "Developers must fix CI before merging"
+          - "Staging deployment works"
+
+      - story_id: "STORY-DEVOPS-002"
+        title: "Error Tracking & Monitoring (Sentry)"
+        description: |
+          Add Sentry for production error tracking. Capture unhandled exceptions, API errors,
+          performance issues. Setup alerts for critical errors. Know immediately when
+          something breaks in production.
+
+        acceptance_criteria:
+          - "Sentry project created and configured"
+          - "Sentry SDK installed in app"
+          - "Unhandled exceptions captured"
+          - "API errors logged to Sentry"
+          - "Performance issues tracked (slow API calls, long rendering)"
+          - "Alerts configured: critical errors → email/Slack"
+          - "Dashboard visible (can browse issues, trends)"
+          - "Release tracking (tied to git commits)"
+
+        effort_hours: 4
+        priority: "MEDIUM"
+        sprint: "4"
+        assigned_to: "@devops"
+        dependencies: []
+        notes: "@devops exclusive (monitoring infrastructure)."
+
+        tasks:
+          - "Create Sentry account and project"
+          - "Install Sentry SDK in package.json"
+          - "Initialize Sentry in app entry point"
+          - "Configure error boundary for React errors"
+          - "Setup performance monitoring"
+          - "Configure alerts (Slack/email)"
+          - "Link releases to git commits"
+          - "Test error capture (intentionally trigger error, verify in Sentry)"
+
+        qa_criteria:
+          - "Errors show up in Sentry dashboard"
+          - "Performance metrics tracked"
+          - "Alerts configured and working"
+          - "Release tracking enabled"
+
+---
+
+  - epic_id: "EPIC-DATA-GOVERNANCE"
+    title: "Data Governance & Compliance"
+    description: |
+      Implement soft delete architecture, audit trail, GDPR/LGPD compliance. Add data
+      recovery capability (admin can recover deleted leads/cards). Design long-term data
+      retention and archival strategy. Prepare for regulatory audits.
+
+      **Impact:** GDPR/LGPD compliance, data recovery capability, enterprise trust
+      **Business Value:** Regulatory compliance, customer trust, ability to prove data handling
+
+    lead: "@data-engineer"
+    collaborators: ["@dev", "@qa"]
+    priority: "MEDIUM"
+    timeline_sprints: ["3", "4"]
+    capacity_recommendation: "0.5 data-engineer + 0.5 dev (admin UI)"
+    total_effort_hours: "16-20h"
+
+    acceptance_criteria:
+      - "Soft delete columns (deleted_at) added to leads, cards, movimentacoes"
+      - "RLS policy: normal users cannot see soft-deleted records"
+      - "Admin role: can see and recover soft-deleted records"
+      - "Data retention policy decided (30 days or 1 year)"
+      - "Admin UI for recovering deleted records"
+      - "GDPR/LGPD compliance documentation complete"
+      - "Data export capability (support user right-to-data)"
+
+    pre_conditions:
+      - "Database hardening complete (constraints, triggers, indexes)"
+      - "User attribution tracking complete (created_by, updated_by)"
+
+    post_conditions:
+      - "Product GDPR/LGPD compliant"
+      - "Data recovery possible (accidental deletion protection)"
+      - "Enterprise customers comfortable with data handling"
+
+    stories:
+      - story_id: "STORY-DATA-001"
+        title: "Implement Soft Deletes (Design & Schema)"
+        description: |
+          Add deleted_at TIMESTAMP to leads, cards, movimentacoes. Create RLS policy:
+          normal users see only non-deleted. Admin role sees all. Design deletion workflow:
+          soft delete by default, hard delete after retention period (30d or 1y).
+
+        acceptance_criteria:
+          - "deleted_at column added to leads, cards, movimentacoes"
+          - "RLS policy created: SELECT WHERE deleted_at IS NULL (for normal users)"
+          - "Admin role RLS policy: no filter (can see soft-deleted)"
+          - "Migration: set deleted_at = NULL for existing records (no changes)"
+          - "Data retention policy documented (30 days or 1 year?)"
+          - "Hard delete strategy documented (automatic purge after retention period)"
+          - "Soft delete tested on staging (user cannot see deleted, admin can)"
+
+        effort_hours: 6
+        priority: "MEDIUM"
+        sprint: "3"
+        assigned_to: "@data-engineer"
+        dependencies: ["STORY-DB-005", "STORY-DB-006", "STORY-DB-007"]
+        notes: "HIGH RISK: RLS policy changes affect every SELECT query. Test thoroughly on staging."
+
+        tasks:
+          - "Add deleted_at TIMESTAMP column to leads, cards, movimentacoes"
+          - "Create RLS policy for normal users (WHERE deleted_at IS NULL)"
+          - "Create RLS policy for admin (no filter)"
+          - "Write migration (set deleted_at = NULL for all existing records)"
+          - "Test RLS: normal user soft-deletes record → verify hidden"
+          - "Test RLS: admin sees soft-deleted record"
+          - "Design hard delete strategy (automatic purge after 30d or 1y)"
+          - "Document retention policy"
+          - "Test on staging copy of production data (2 week validation)"
+
+        qa_criteria:
+          - "Soft delete RLS working correctly"
+          - "Normal users cannot see soft-deleted records"
+          - "Admin can see soft-deleted records"
+          - "No data loss during migration"
+
+      - story_id: "STORY-DATA-002"
+        title: "Admin UI for Data Recovery (Soft Deletes)"
+        description: |
+          Admin dashboard: view soft-deleted leads/cards, restore with one click.
+          Implementation: admin-only page showing deleted items, restore/permanently-delete buttons.
+          Stretch goal: undo interface (restore within 30 days).
+
+        acceptance_criteria:
+          - "Admin page: list of soft-deleted leads (with deletion date)"
+          - "Admin page: list of soft-deleted cards (with deletion date)"
+          - "Restore button: recover record (set deleted_at = NULL)"
+          - "Permanently delete button: hard delete (for records past retention period)"
+          - "Confirmation dialog before permanent deletion"
+          - "Audit trail: recovery logged (created_by, created_at in movimentacoes)"
+          - "Admin-only access (verify user role in RLS)"
+
+        effort_hours: 4
+        priority: "MEDIUM"
+        sprint: "4"
+        assigned_to: "@dev"
+        dependencies: ["STORY-DATA-001"]
+        notes: "Stretch goal: might not be completed by MVP launch."
+
+        tasks:
+          - "Create AdminDashboard component"
+          - "Create DeletedLeadsTable component (soft-deleted leads)"
+          - "Create DeletedCardsTable component (soft-deleted cards)"
+          - "Implement restore functionality (UPDATE deleted_at = NULL)"
+          - "Implement permanent delete functionality (DELETE)"
+          - "Add confirmation dialogs"
+          - "Log recovery to audit trail (movimentacoes)"
+          - "Test admin-only access (verify RLS blocks non-admins)"
+          - "Test restore/delete workflows"
+
+        qa_criteria:
+          - "Admin can view soft-deleted records"
+          - "Restore button works (record undeleted)"
+          - "Permanent delete button works (record hard deleted)"
+          - "Non-admins cannot access admin page"
+
+      - story_id: "STORY-DATA-003"
+        title: "Data Export & Right-to-Data (GDPR Compliance)"
+        description: |
+          Implement data export: user can request all their data in CSV/JSON format.
+          GDPR Article 15 (right to access). API endpoint: GET /api/user/export → returns
+          all data belonging to user (leads, cards, movements, metadata).
+
+        acceptance_criteria:
+          - "API endpoint: GET /api/user/export"
+          - "Returns: JSON file with all user data (leads, cards, movements, audit trail)"
+          - "CSV export option (alternative to JSON)"
+          - "Download triggered from user settings or admin dashboard"
+          - "Includes: lead data, card data, audit trail, timestamps, user attribution"
+          - "Excludes: soft-deleted records (unless requested explicitly)"
+          - "Audit logged: export request created_by, created_at"
+
+        effort_hours: 4
+        priority: "MEDIUM"
+        sprint: "4"
+        assigned_to: "@dev"
+        dependencies: ["STORY-DATA-001", "STORY-DATA-002"]
+        notes: "GDPR requirement if operating in EU. MVP: defer to Q2 if not critical."
+
+        tasks:
+          - "Create API endpoint /api/user/export"
+          - "Query all user data (leads, cards, movements, audit)"
+          - "Format as JSON (and CSV option)"
+          - "Stream file download (prevent memory overload)"
+          - "Log export request to audit trail"
+          - "Add UI button in user settings: 'Download my data'"
+          - "Test export (verify data completeness and accuracy)"
+
+        qa_criteria:
+          - "Export endpoint works (returns JSON/CSV)"
+          - "Data complete (leads, cards, audit trail)"
+          - "File downloads correctly"
+          - "Export logged to audit trail"
+
+      - story_id: "STORY-DATA-004"
+        title: "GDPR/LGPD Compliance Documentation"
+        description: |
+          Document compliance: data retention policy, processing, user rights. Create
+          Data Processing Agreement (DPA) for customers. Document soft delete strategy,
+          audit trail, user attribution. Compliance checklist: ready for audit.
+
+        acceptance_criteria:
+          - "Data Retention Policy documented (30-day or 1-year soft delete period)"
+          - "Data Processing Agreement (DPA) drafted (for customers)"
+          - "Audit Trail documented (who did what when)"
+          - "User Rights documented (access, export, deletion)"
+          - "RLS Policy documented (how data segregation works)"
+          - "Compliance checklist: GDPR/LGPD requirements mapped to features"
+          - "Sign-off from @architect + @data-engineer"
+
+        effort_hours: 2
+        priority: "MEDIUM"
+        sprint: "4"
+        assigned_to: "@data-engineer"
+        dependencies: ["STORY-DATA-001", "STORY-DATA-002", "STORY-DATA-003"]
+
+        tasks:
+          - "Write Data Retention Policy (when data is deleted, how long kept)"
+          - "Draft Data Processing Agreement (DPA template for customers)"
+          - "Document Audit Trail (created_by, updated_by, timestamps)"
+          - "Document User Rights (GDPR Articles 15, 17, 20)"
+          - "Document RLS Policy (how data segregation protects users)"
+          - "Create compliance checklist (GDPR/LGPD mapped to features)"
+          - "Get sign-off from @architect + @data-engineer"
+
+        qa_criteria:
+          - "Documentation complete and signed off"
+          - "Compliance checklist shows all requirements met"
+          - "DPA ready for customer use"
+
+---
+
+## IMPLEMENTATION SEQUENCE & CRITICAL PATH
+
+```yaml
+critical_path:
+  - phase: "Week 1 (Sprint 1.0)"
+    parallel:
+      - epic: "EPIC-DB-HARDENING"
+        story: "STORY-DB-001"
+        effort: "1h"
+        status: "CRITICAL — unblocks all other database work"
+
+      - epic: "EPIC-DB-HARDENING"
+        story: "STORY-DB-003"
+        effort: "4h"
+        status: "CRITICAL — validates data before other changes"
+
+      - epic: "EPIC-MOBILE-RESPONSIVE"
+        story: "STORY-FE-001"
+        effort: "10h"
+        status: "BLOCKER for all mobile work (FE-002, FE-003, FE-004)"
+
+      - epic: "EPIC-ACCESSIBILITY"
+        story: "STORY-ACC-001"
+        effort: "6h"
+        status: "CRITICAL — keyboard accessibility foundation"
+
+      - epic: "EPIC-ACCESSIBILITY"
+        story: "STORY-ACC-002"
+        effort: "6h"
+        status: "HIGH — aria-labels + semantic HTML"
+
+      - epic: "EPIC-ACCESSIBILITY"
+        story: "STORY-ACC-003"
+        effort: "2h"
+        status: "HIGH — focus indicators"
+
+      - epic: "EPIC-ACCESSIBILITY"
+        story: "STORY-ACC-004"
+        effort: "1h"
+        status: "HIGH — skip link + language"
+
+  - phase: "Week 2 (Sprint 1.5)"
+    sequential:
+      - epic: "EPIC-DB-HARDENING"
+        story: "STORY-DB-002"
+        effort: "3h"
+        depends_on: "STORY-DB-001"
+        status: "CRITICAL — race condition fix, multi-user enabler"
+
+      - epic: "EPIC-MOBILE-RESPONSIVE"
+        story: "FE-004 Integration & Testing"
+        effort: "2h"
+        depends_on: "STORY-DB-002"
+        status: "Integration only (mobile work independent)"
+
+  - phase: "Weeks 3-4 (Sprint 2) — BUSY"
+    parallel:
+      - epic: "EPIC-DB-HARDENING"
+        stories: "STORY-DB-004, STORY-DB-005, STORY-DB-006"
+        effort: "7h"
+        status: "Database hardening continues"
+
+      - epic: "EPIC-MOBILE-RESPONSIVE"
+        stories: "STORY-FE-002, STORY-FE-003, STORY-FE-004"
+        effort: "22h"
+        depends_on: "STORY-FE-001"
+        status: "Mobile design implementation (requires design approval)"
+
+      - epic: "EPIC-ACCESSIBILITY"
+        story: "STORY-ACC-005"
+        effort: "4h"
+        status: "Keyboard navigation testing"
+
+  - phase: "Weeks 5-6 (Sprint 3)"
+    parallel:
+      - epic: "EPIC-DB-HARDENING"
+        stories: "STORY-DB-007, STORY-DB-008, STORY-DB-009"
+        effort: "8h"
+        status: "Database hardening finalization"
+
+      - epic: "EPIC-PERFORMANCE-DEVOPS"
+        stories: "STORY-PERF-001, STORY-PERF-002, STORY-PERF-003"
+        effort: "10h"
+        status: "Performance optimization + monitoring"
+
+      - epic: "EPIC-ACCESSIBILITY"
+        story: "STORY-ACC-006"
+        effort: "4h"
+        status: "Final WCAG audit"
+
+      - epic: "EPIC-DATA-GOVERNANCE"
+        story: "STORY-DATA-001"
+        effort: "6h"
+        status: "Soft delete implementation"
+
+  - phase: "Weeks 7+ (Sprint 4+)"
+    sequential:
+      - epic: "EPIC-PERFORMANCE-DEVOPS"
+        story: "STORY-DEVOPS-001"
+        effort: "4h"
+        status: "CI/CD pipeline (@devops exclusive)"
+
+      - epic: "EPIC-PERFORMANCE-DEVOPS"
+        story: "STORY-DEVOPS-002"
+        effort: "4h"
+        status: "Error tracking (@devops exclusive)"
+
+      - epic: "EPIC-DATA-GOVERNANCE"
+        stories: "STORY-DATA-002, STORY-DATA-003, STORY-DATA-004"
+        effort: "10h"
+        status: "Compliance features + documentation"
+```
+
+---
+
+## CAPACITY PLANNING & TEAM ALLOCATION
+
+### Option A: Single Developer (6-8 weeks)
+
+```yaml
+capacity_plan_1_dev:
+  sprint_1_0:
+    total_capacity: "40h"
+    allocated: "21.5h"
+    remaining: "18.5h"
+    assignments:
+      - "Database: SEC-001 (1h), DB-001/002/003 (4h) = 5.5h"
+      - "Frontend: FE-001 (10h), FE-003 (6h) = 16h"
+    notes: "Tight but manageable. Parallel work (database + frontend independent)"
+
+  sprint_1_5:
+    total_capacity: "40h"
+    allocated: "5h"
+    remaining: "35h"
+    assignments:
+      - "Database: SEC-002 (3h) = 3h"
+      - "Frontend: Integration & testing (2h) = 2h"
+    notes: "Light week, good for stabilization"
+
+  sprint_2:
+    total_capacity: "40h"
+    allocated: "28h"
+    remaining: "12h"
+    assignments:
+      - "Database: DB-004, DB-005, DB-006 (8h) = 8h"
+      - "Frontend: FE-002, FE-003, FE-004 (22h) = 22h"
+    notes: "HEAVY. Consider splitting with QA support on testing"
+
+  sprint_3:
+    total_capacity: "40h"
+    allocated: "20h"
+    remaining: "20h"
+    assignments:
+      - "Database: DB-007, DB-008, DB-009 (8h) = 8h"
+      - "Frontend: PERF-001, PERF-002, PERF-003 (10h) = 10h"
+      - "Data: DATA-001 (2h) = 2h"
+    notes: "Balanced, parallel work"
+
+  sprint_4:
+    total_capacity: "40h"
+    allocated: "10h"
+    remaining: "30h"
+    assignments:
+      - "DevOps: DEVOPS-001, DEVOPS-002 (8h) — @devops exclusive"
+      - "Data: DATA-002, DATA-003, DATA-004 (10h) = 10h"
+    notes: "Lighter (DevOps work offloaded to @devops)"
+
+  total_timeline: "8 weeks"
+  risk_level: "MEDIUM-HIGH (Sprint 2 tight, little buffer)"
+```
+
+### Option B: Two Developers (4-6 weeks)
+
+```yaml
+capacity_plan_2_devs:
+  sprint_1_0:
+    total_capacity: "80h"
+    allocated: "21.5h"
+    remaining: "58.5h"
+    assignments:
+      - "Dev 1 (Database focus): Database work (5.5h)"
+      - "Dev 2 (Frontend focus): FE-001, FE-003 (16h)"
+    parallelization: "TRUE — full parallel"
+    notes: "Very comfortable capacity buffer"
+
+  sprint_1_5:
+    total_capacity: "80h"
+    allocated: "5h"
+    remaining: "75h"
+    assignments:
+      - "Dev 1: SEC-002 (3h)"
+      - "Dev 2: Integration (2h)"
+    parallelization: "TRUE"
+    notes: "Stabilization sprint"
+
+  sprint_2:
+    total_capacity: "80h"
+    allocated: "28h"
+    remaining: "52h"
+    assignments:
+      - "Dev 1 (Database): DB-004, DB-005, DB-006 (8h)"
+      - "Dev 2 (Frontend): FE-002, FE-003, FE-004 (22h)"
+      - "QA (1 person from team): Keyboard testing (4h)"
+    parallelization: "TRUE — full parallel"
+    notes: "Comfortable capacity, good buffer for design changes"
+
+  sprint_3:
+    total_capacity: "80h"
+    allocated: "20h"
+    remaining: "60h"
+    assignments:
+      - "Dev 1: DB-007, DB-008, DB-009, DATA-001 (14h)"
+      - "Dev 2: PERF-001, PERF-002, PERF-003 (10h)"
+    parallelization: "TRUE"
+    notes: "Well-balanced, high confidence"
+
+  sprint_4:
+    total_capacity: "80h"
+    allocated: "18h"
+    remaining: "62h"
+    assignments:
+      - "@devops: DEVOPS-001, DEVOPS-002 (8h) — exclusive"
+      - "Dev 1 or 2: DATA-002, DATA-003, DATA-004 (10h)"
+    notes: "Polish sprint, nice-to-have work"
+
+  total_timeline: "6 weeks"
+  risk_level: "LOW (abundant capacity buffer, full parallelization)"
+```
+
+---
+
+## SIGN-OFF & APPROVAL
+
+### Phase 10 Complete ✓
+
+| Component | Status | Responsible |
+|-----------|--------|-------------|
+| **Epic 1: Database Hardening** | Ready | @data-engineer (Dara) |
+| **Epic 2: Mobile & Responsive** | Ready | @dev (Dex) + @ux-design-expert (Uma) |
+| **Epic 3: Accessibility** | Ready | @dev (Dex) + @qa (Quinn) |
+| **Epic 4: Performance & DevOps** | Ready | @dev (Dex) + @devops (Gage) |
+| **Epic 5: Data Governance** | Ready | @data-engineer (Dara) |
+| **Critical Path Identified** | ✓ | @pm (Morgan) |
+| **Capacity Planning** | ✓ | @pm (Morgan) |
+| **Risk Assessment** | ✓ | @architect (Aria) |
+
+### Ready for Phase 11 (@sm) ✓
+
+Stories ready for creation from these epics. All stories have:
+- Clear acceptance criteria
+- Effort estimates
+- Sprint assignments
+- Dependencies mapped
+- Risk mitigations identified
+- Testing requirements defined
+
+**Next Steps:**
+1. @sm creates detailed stories from these epics (Phase 11)
+2. @po validates stories (10-point checklist)
+3. @dev implements (Story Development Cycle)
+4. @qa gates (quality checks)
+5. @devops pushes (deployments)
+
+---
+
+*BROWNFIELD DISCOVERY EPICS — FINAL. Phase 10 Complete. Ready for Story Generation and Implementation.*
+
+*Generated: 2026-02-20*
+*Assessment Period: Brownfield Discovery Phases 1-10*
+*Total Debt Consolidated: 26 items → 5 epics → 22 stories*
+*Timeline: 6-8 weeks (1 dev) or 4-6 weeks (2 devs)*
+*Next: Phase 11 (@sm creates stories) → Implementation → Delivery*
