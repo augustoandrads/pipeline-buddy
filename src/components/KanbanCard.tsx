@@ -26,9 +26,13 @@ export function KanbanCard({ card, isDragging = false }: KanbanCardProps) {
       style={style}
       {...listeners}
       {...attributes}
+      role="button"
+      tabIndex={0}
+      aria-label={`Card: ${lead?.nome ?? "Sem nome"} em ${lead?.empresa ?? "empresa desconhecida"}`}
       className={cn(
         "cursor-grab rounded-lg border bg-card p-3 shadow-sm transition-all select-none",
         "hover:shadow-md hover:border-primary/30",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
         isDragging && "cursor-grabbing opacity-80 shadow-xl rotate-1 scale-105"
       )}
     >
