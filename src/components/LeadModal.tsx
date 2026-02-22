@@ -37,7 +37,7 @@ const formSchema = z.object({
   telefone: z.string().optional(),
   quantidade_imoveis: z.coerce.number().optional(),
   valor_estimado_contrato: z.coerce.number().optional(),
-  origem: z.string().optional(),
+  origem: z.enum(["INSTAGRAM", "FACEBOOK", "GOOGLE", "YOUTUBE", "LINKEDIN", "ANUNCIOS"]).optional(),
   observacoes: z.string().optional(),
 });
 
@@ -172,7 +172,7 @@ export function LeadModal({ open, onClose, onSubmit, isLoading }: LeadModalProps
                 name="quantidade_imoveis"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Qtd. de imóveis</FormLabel>
+                    <FormLabel>Leads/Mês</FormLabel>
                     <FormControl>
                       <Input type="number" placeholder="150" {...field} />
                     </FormControl>
@@ -186,7 +186,7 @@ export function LeadModal({ open, onClose, onSubmit, isLoading }: LeadModalProps
                 name="valor_estimado_contrato"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Valor estimado (R$)</FormLabel>
+                    <FormLabel>Valor da Negociação (R$)</FormLabel>
                     <FormControl>
                       <Input type="number" placeholder="5000" {...field} />
                     </FormControl>
@@ -200,10 +200,22 @@ export function LeadModal({ open, onClose, onSubmit, isLoading }: LeadModalProps
                 name="origem"
                 render={({ field }) => (
                   <FormItem className="col-span-2">
-                    <FormLabel>Origem do lead</FormLabel>
-                    <FormControl>
-                      <Input placeholder="LinkedIn, Indicação, Evento..." {...field} />
-                    </FormControl>
+                    <FormLabel>Origem do Lead</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a origem" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="INSTAGRAM">Instagram</SelectItem>
+                        <SelectItem value="FACEBOOK">Facebook</SelectItem>
+                        <SelectItem value="GOOGLE">Google</SelectItem>
+                        <SelectItem value="YOUTUBE">Youtube</SelectItem>
+                        <SelectItem value="LINKEDIN">LinkedIn</SelectItem>
+                        <SelectItem value="ANUNCIOS">Anúncios</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
