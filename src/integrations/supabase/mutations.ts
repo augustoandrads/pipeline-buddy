@@ -63,7 +63,7 @@ async function sleep(ms: number): Promise<void> {
 // MAIN MUTATION: Create Lead with Card (with retry logic)
 // ============================================================================
 
-export interface CreateLeadInput extends Omit<Lead, 'id' | 'criado_em'> {}
+export type CreateLeadInput = Omit<Lead, 'id' | 'criado_em'>;
 
 export interface CreateLeadResponse {
   lead_id: string;
