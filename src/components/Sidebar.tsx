@@ -28,7 +28,7 @@ function NavigationContent({ onNavigate }: { onNavigate?: () => void }) {
           <TrendingUp className="h-4 w-4 text-sidebar-primary-foreground" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-sidebar-accent-foreground">PropTech CRM</p>
+          <p className="text-sm font-semibold text-sidebar-accent-foreground">CRM Lead2Sales</p>
           <p className="text-xs text-sidebar-foreground">Pipeline Comercial</p>
         </div>
       </div>

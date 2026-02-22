@@ -24,7 +24,7 @@
 - ✅ **Sidebar visible** — `<aside className="hidden md:flex">` renders on desktop
 - ✅ **Fixed width** — `w-60` (240px) matches requirement
 - ✅ **Navigation items visible** — Kanban, Leads, Relatórios all in sidebar
-- ✅ **Logo visible** — PropTech CRM branding in sidebar
+- ✅ **Logo visible** — CRM Lead2Sales branding in sidebar
 - ✅ **Responsive layout** — `flex` container with `main` taking remaining space
 
 **Evidence:**

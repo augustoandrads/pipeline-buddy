@@ -20,7 +20,7 @@
 ```
 ✓ Expected: Full sidebar visible (240px wide, dark background)
 ✓ Navigation items: Kanban, Leads, Relatórios all visible
-✓ Logo: PropTech CRM branding at top
+✓ Logo: CRM Lead2Sales branding at top
 ✓ Footer: "Sistema Interno v1.0" at bottom
 
 Test on breakpoints:
