@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, Lead, ETAPAS, TIPO_CLIENTE_LABELS, TipoCliente } from "@/types/crm";
 import { Loader2, TrendingUp, Users, DollarSign, Target } from "lucide-react";
 import { differenceInDays, parseISO } from "date-fns";
+import { FunnelChart } from "@/components/FunnelChart";
+import { useFunnelData } from "@/hooks/useFunnelData";
 
 interface StatCardProps {
   title: string;
@@ -48,7 +50,9 @@ export default function RelatoriosPage() {
     },
   });
 
-  const isLoading = leadsLoading || cardsLoading;
+  const { data: funnelData = [], isLoading: funnelLoading } = useFunnelData();
+
+  const isLoading = leadsLoading || cardsLoading || funnelLoading;
 
   const totalValorPipeline = cards.reduce(
     (sum, c) => sum + (c.leads?.valor_estimado_contrato ?? 0),
@@ -114,7 +118,7 @@ export default function RelatoriosPage() {
           />
         </div>
 
-        {/* Funil por etapa */}
+        {/* Distribuição por Etapa - Onde os leads estão AGORA */}
         <div className="rounded-xl border bg-card p-5">
           <h2 className="text-sm font-semibold mb-4">Distribuição por Etapa</h2>
           <div className="space-y-3">
@@ -143,6 +147,13 @@ export default function RelatoriosPage() {
               );
             })}
           </div>
+        </div>
+
+        {/* Funil de Vendas - Desempenho de Avanço */}
+        <div className="rounded-xl border bg-card p-5">
+          <h2 className="text-sm font-semibold mb-4">Funil de Vendas</h2>
+          <p className="text-xs text-muted-foreground mb-4">Desempenho de avanço na jornada - Taxa de conversão entre etapas</p>
+          <FunnelChart data={funnelData} />
         </div>
 
         {/* Por tipo de cliente */}
