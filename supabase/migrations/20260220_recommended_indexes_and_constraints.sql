@@ -336,26 +336,5 @@ BEFORE APPLYING THIS MIGRATION:
 -- END OF MIGRATION
 -- ============================================================================
 
--- Verification query (run after migration)
--- Should show all new indexes and constraints
-
-SELECT
-  'Indexes' as object_type,
-  indexname as name,
-  tablename as related_object
-FROM pg_indexes
-WHERE schemaname = 'public'
-  AND indexname LIKE 'idx_%'
-ORDER BY indexname
-
-UNION ALL
-
-SELECT
-  'Constraints' as object_type,
-  constraint_name as name,
-  table_name as related_object
-FROM information_schema.table_constraints
-WHERE table_schema = 'public'
-  AND constraint_name LIKE '%check_%'
-  OR constraint_name LIKE 'unique_%'
-ORDER BY constraint_name;
+-- Note: Verification queries can be run separately in SQL Editor
+-- to confirm all indexes and constraints were created successfully

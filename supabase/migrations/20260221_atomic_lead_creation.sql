@@ -1,10 +1,12 @@
 -- Sprint 1.5: Atomic Lead + Card Creation & Race Condition Fix
 -- This migration adds database functions for atomically creating leads with initial cards
 
--- 1. Add unique constraint on email to prevent race conditions
-ALTER TABLE leads ADD CONSTRAINT unique_lead_email UNIQUE(email) WHERE email IS NOT NULL;
+-- 1. Add unique constraint on email to prevent race conditions (using partial index for NULLs)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_email_unique
+ON public.leads(email)
+WHERE email IS NOT NULL;
 
--- 2. Create atomic function for lead + card creation
+-- 2. Create atomic function for lead + card creation (CORRECTED - Schema consistency)
 CREATE OR REPLACE FUNCTION create_lead_with_card(
   p_name VARCHAR,
   p_email VARCHAR,
@@ -22,7 +24,7 @@ DECLARE
   v_card_id UUID;
 BEGIN
   -- Insert lead (email uniqueness enforced by constraint)
-  INSERT INTO leads (
+  INSERT INTO public.leads (
     nome,
     email,
     empresa,
@@ -45,23 +47,22 @@ BEGIN
     p_observacoes,
     p_created_by
   )
-  RETURNING leads.id INTO v_lead_id;
+  RETURNING public.leads.id INTO v_lead_id;
 
   -- Insert initial card (REUNIAO_REALIZADA stage)
-  INSERT INTO cards (
+  -- Fixed: use correct column names from schema (data_entrada_etapa, etapa)
+  INSERT INTO public.cards (
     lead_id,
     etapa,
-    data_entrada,
-    status,
+    data_entrada_etapa,
     created_by
   ) VALUES (
     v_lead_id,
     'REUNIAO_REALIZADA',
     NOW(),
-    'REUNIAO_REALIZADA',
     p_created_by
   )
-  RETURNING cards.id INTO v_card_id;
+  RETURNING public.cards.id INTO v_card_id;
 
   -- Return both IDs
   RETURN QUERY SELECT v_lead_id, v_card_id;
@@ -81,8 +82,8 @@ BEGIN
       WHEN COUNT(c.id) = 1 THEN 'OK'
       ELSE 'DUPLICATE_CARDS'
     END AS status
-  FROM leads l
-  LEFT JOIN cards c ON l.id = c.lead_id
+  FROM public.leads l
+  LEFT JOIN public.cards c ON l.id = c.lead_id
   GROUP BY l.id;
 END;
 $$ LANGUAGE plpgsql;
