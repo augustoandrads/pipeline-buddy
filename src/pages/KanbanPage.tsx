@@ -10,13 +10,14 @@ import {
   useSensors,
   closestCenter,
 } from "@dnd-kit/core";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, Etapa, ETAPAS, Lead } from "@/types/crm";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCard } from "@/components/KanbanCard";
 import { KanbanSkeleton } from "@/components/KanbanSkeleton";
 import { LeadDetailsSidebar } from "@/components/LeadDetailsSidebar";
+import { LeadFilter, LeadFilters } from "@/components/LeadFilter";
 import { useToast } from "@/hooks/use-toast";
 
 export default function KanbanPage() {
@@ -24,7 +25,13 @@ export default function KanbanPage() {
   const { toast } = useToast();
   const [activeCard, setActiveCard] = useState<Card | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [filters, setFilters] = useState<LeadFilters>({
+    origens: [],
+    tipos: [],
+    valueRange: [0, 1000000],
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -84,11 +91,37 @@ export default function KanbanPage() {
     moveCard.mutate({ cardId: card.id, novaEtapa, etapaAnterior: card.etapa });
   };
 
-  const getCardsForEtapa = (etapa: Etapa) => cards.filter((c) => c.etapa === etapa);
+  const filteredCards = useMemo(() => {
+    return cards.filter((c) => {
+      const lead = c.leads;
+      if (!lead) return false;
 
-  const handleLeadClick = (lead: Lead | undefined) => {
+      // Filtro por origem
+      if (filters.origens.length > 0 && !filters.origens.includes(lead.origem || "")) {
+        return false;
+      }
+
+      // Filtro por tipo de cliente
+      if (filters.tipos.length > 0 && !filters.tipos.includes(lead.tipo_cliente)) {
+        return false;
+      }
+
+      // Filtro por valor
+      const value = lead.valor_estimado_contrato || 0;
+      if (value < filters.valueRange[0] || value > filters.valueRange[1]) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [cards, filters]);
+
+  const getCardsForEtapa = (etapa: Etapa) => filteredCards.filter((c) => c.etapa === etapa);
+
+  const handleLeadClick = (lead: Lead | undefined, card?: Card) => {
     if (lead) {
       setSelectedLead(lead);
+      setSelectedCard(card || null);
       setIsSidebarOpen(true);
     }
   };
@@ -107,13 +140,25 @@ export default function KanbanPage() {
     );
   }
 
+  const maxCardValue = Math.max(
+    ...cards.map((c) => c.leads?.valor_estimado_contrato || 0)
+  );
+  const defaultFilters: LeadFilters = {
+    origens: [],
+    tipos: [],
+    valueRange: [0, maxCardValue],
+  };
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex items-center justify-between border-b bg-card px-6 py-4">
-        <div>
+        <div className="flex-1">
           <h1 className="text-lg font-semibold">Pipeline Comercial</h1>
-          <p className="text-sm text-muted-foreground">{cards.length} card{cards.length !== 1 ? "s" : ""} ativos</p>
+          <p className="text-sm text-muted-foreground">{filteredCards.length} de {cards.length} card{cards.length !== 1 ? "s" : ""}</p>
+        </div>
+        <div className="w-40">
+          <LeadFilter leads={cards.map((c) => c.leads).filter(Boolean) as Lead[]} onFiltersChange={setFilters} activeFilters={filters} />
         </div>
       </div>
 
@@ -143,6 +188,7 @@ export default function KanbanPage() {
       {/* Lead Details Sidebar */}
       <LeadDetailsSidebar
         lead={selectedLead}
+        card={selectedCard}
         open={isSidebarOpen}
         onOpenChange={setIsSidebarOpen}
       />

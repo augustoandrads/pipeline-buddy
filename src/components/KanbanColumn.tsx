@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 interface KanbanColumnProps {
   etapa: typeof ETAPAS[number];
   cards: Card[];
-  onCardClick?: (lead: Lead | undefined) => void;
+  onCardClick?: (lead: Lead | undefined, card?: Card) => void;
 }
 
 const ETAPA_COLORS: Record<string, string> = {

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 interface KanbanCardProps {
   card: CardType;
   isDragging?: boolean;
-  onLeadClick?: (lead: CardType["leads"]) => void;
+  onLeadClick?: (lead: CardType["leads"], card?: CardType) => void;
 }
 
 export function KanbanCard({ card, isDragging = false, onLeadClick }: KanbanCardProps) {
@@ -33,7 +33,7 @@ export function KanbanCard({ card, isDragging = false, onLeadClick }: KanbanCard
       onClick={(e) => {
         if (!isDragging && onLeadClick && lead) {
           e.stopPropagation();
-          onLeadClick(lead);
+          onLeadClick(lead, card);
         }
       }}
       className={cn(
