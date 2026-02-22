@@ -1,11 +1,12 @@
 import { useDroppable } from "@dnd-kit/core";
-import { Card, Etapa, ETAPAS } from "@/types/crm";
+import { Card, Etapa, ETAPAS, Lead } from "@/types/crm";
 import { KanbanCard } from "@/components/KanbanCard";
 import { cn } from "@/lib/utils";
 
 interface KanbanColumnProps {
   etapa: typeof ETAPAS[number];
   cards: Card[];
+  onCardClick?: (lead: Lead | undefined) => void;
 }
 
 const ETAPA_COLORS: Record<string, string> = {
@@ -24,7 +25,7 @@ const BADGE_COLORS: Record<string, string> = {
   VENDA_FECHADA: "bg-[hsl(var(--etapa-venda)/0.1)] text-[hsl(var(--etapa-venda))]",
 };
 
-export function KanbanColumn({ etapa, cards }: KanbanColumnProps) {
+export function KanbanColumn({ etapa, cards, onCardClick }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: etapa.key });
 
   const totalValor = cards.reduce((sum, c) => sum + (c.leads?.valor_estimado_contrato ?? 0), 0);
@@ -56,7 +57,7 @@ export function KanbanColumn({ etapa, cards }: KanbanColumnProps) {
       {/* Cards */}
       <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-3 pb-4 min-h-[200px]">
         {cards.map((card) => (
-          <KanbanCard key={card.id} card={card} />
+          <KanbanCard key={card.id} card={card} onLeadClick={onCardClick} />
         ))}
         {cards.length === 0 && (
           <div className="flex flex-1 items-center justify-center rounded-lg border-2 border-dashed border-border py-8">

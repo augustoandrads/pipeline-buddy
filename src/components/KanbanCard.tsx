@@ -8,9 +8,10 @@ import { cn } from "@/lib/utils";
 interface KanbanCardProps {
   card: CardType;
   isDragging?: boolean;
+  onLeadClick?: (lead: CardType["leads"]) => void;
 }
 
-export function KanbanCard({ card, isDragging = false }: KanbanCardProps) {
+export function KanbanCard({ card, isDragging = false, onLeadClick }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: card.id });
 
   const style = {
@@ -29,6 +30,12 @@ export function KanbanCard({ card, isDragging = false }: KanbanCardProps) {
       role="button"
       tabIndex={0}
       aria-label={`Card: ${lead?.nome ?? "Sem nome"} em ${lead?.empresa ?? "empresa desconhecida"}`}
+      onClick={(e) => {
+        if (!isDragging && onLeadClick && lead) {
+          e.stopPropagation();
+          onLeadClick(lead);
+        }
+      }}
       className={cn(
         "cursor-grab rounded-lg border bg-card p-3 shadow-sm transition-all select-none",
         "hover:shadow-md hover:border-primary/30",

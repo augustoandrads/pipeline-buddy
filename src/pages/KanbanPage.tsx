@@ -12,16 +12,19 @@ import {
 } from "@dnd-kit/core";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, Etapa, ETAPAS } from "@/types/crm";
+import { Card, Etapa, ETAPAS, Lead } from "@/types/crm";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCard } from "@/components/KanbanCard";
 import { KanbanSkeleton } from "@/components/KanbanSkeleton";
+import { LeadDetailsSidebar } from "@/components/LeadDetailsSidebar";
 import { useToast } from "@/hooks/use-toast";
 
 export default function KanbanPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeCard, setActiveCard] = useState<Card | null>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -83,6 +86,13 @@ export default function KanbanPage() {
 
   const getCardsForEtapa = (etapa: Etapa) => cards.filter((c) => c.etapa === etapa);
 
+  const handleLeadClick = (lead: Lead | undefined) => {
+    if (lead) {
+      setSelectedLead(lead);
+      setIsSidebarOpen(true);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-full flex-col">
@@ -120,6 +130,7 @@ export default function KanbanPage() {
               key={etapa.key}
               etapa={etapa}
               cards={getCardsForEtapa(etapa.key)}
+              onCardClick={handleLeadClick}
             />
           ))}
         </div>
@@ -128,6 +139,13 @@ export default function KanbanPage() {
           {activeCard ? <KanbanCard card={activeCard} isDragging /> : null}
         </DragOverlay>
       </DndContext>
+
+      {/* Lead Details Sidebar */}
+      <LeadDetailsSidebar
+        lead={selectedLead}
+        open={isSidebarOpen}
+        onOpenChange={setIsSidebarOpen}
+      />
     </div>
   );
 }
