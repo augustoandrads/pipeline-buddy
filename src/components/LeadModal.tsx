@@ -33,11 +33,13 @@ const formSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   empresa: z.string().min(1, "Empresa é obrigatória"),
   tipo_cliente: z.enum(["IMOBILIARIA", "CONSTRUTORA", "CORRETOR"]),
-  email: z.string().email("E-mail inválido").optional().or(z.literal("")),
-  telefone: z.string().optional(),
+  email: z.string().email("E-mail inválido").min(1, "E-mail é obrigatório"),
+  telefone: z.string().min(1, "Telefone é obrigatório"),
   quantidade_imoveis: z.coerce.number().optional(),
-  valor_estimado_contrato: z.coerce.number().optional(),
-  origem: z.enum(["INSTAGRAM", "FACEBOOK", "GOOGLE", "YOUTUBE", "LINKEDIN", "ANUNCIOS"]).optional(),
+  valor_estimado_contrato: z.coerce.number().min(0.01, "Valor da Negociação é obrigatório"),
+  origem: z.enum(["INSTAGRAM", "FACEBOOK", "GOOGLE", "YOUTUBE", "LINKEDIN", "ANUNCIOS"], {
+    errorMap: () => ({ message: "Origem do Lead é obrigatória" }),
+  }),
   observacoes: z.string().optional(),
 });
 
@@ -144,7 +146,7 @@ export function LeadModal({ open, onClose, onSubmit, isLoading }: LeadModalProps
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>E-mail</FormLabel>
+                    <FormLabel>E-mail *</FormLabel>
                     <FormControl>
                       <Input placeholder="joao@empresa.com" type="email" {...field} />
                     </FormControl>
@@ -158,7 +160,7 @@ export function LeadModal({ open, onClose, onSubmit, isLoading }: LeadModalProps
                 name="telefone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Telefone</FormLabel>
+                    <FormLabel>Telefone *</FormLabel>
                     <FormControl>
                       <Input placeholder="(11) 99999-9999" {...field} />
                     </FormControl>
@@ -186,7 +188,7 @@ export function LeadModal({ open, onClose, onSubmit, isLoading }: LeadModalProps
                 name="valor_estimado_contrato"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Valor da Negociação (R$)</FormLabel>
+                    <FormLabel>Valor da Negociação (R$) *</FormLabel>
                     <FormControl>
                       <Input type="number" placeholder="5000" {...field} />
                     </FormControl>
@@ -200,7 +202,7 @@ export function LeadModal({ open, onClose, onSubmit, isLoading }: LeadModalProps
                 name="origem"
                 render={({ field }) => (
                   <FormItem className="col-span-2">
-                    <FormLabel>Origem do Lead</FormLabel>
+                    <FormLabel>Origem do Lead *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || ""}>
                       <FormControl>
                         <SelectTrigger>
