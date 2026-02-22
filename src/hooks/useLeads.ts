@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { createLeadWithCardRetry, CreateLeadInput } from "@/integrations/supabase/mutations";
 import { Lead } from "@/types/crm";
 
 export const useLeads = () => {
@@ -23,30 +24,22 @@ export const useLeads = () => {
     },
   });
 
-  // Create a new lead with initial card
+  // Create a new lead with initial card (with exponential backoff retry)
+  // Epic 1: TAREFA 4 - Implement retry logic for race condition prevention
   const createLeadMutation = useMutation({
-    mutationFn: async (newLead: Omit<Lead, "id" | "criado_em">) => {
-      // Use the atomic function to create lead + card in one transaction
-      const { data, error } = await supabase.rpc("create_lead_with_card", {
-        p_name: newLead.nome,
-        p_email: newLead.email,
-        p_company: newLead.empresa,
-        p_tipo_cliente: newLead.tipo_cliente,
-        p_telefone: newLead.telefone,
-        p_quantidade_imoveis: newLead.quantidade_imoveis,
-        p_valor_estimado_contrato: newLead.valor_estimado_contrato,
-        p_origem: newLead.origem,
-        p_observacoes: newLead.observacoes,
-      });
-
-      if (error) throw error;
-      return data;
+    mutationFn: async (newLead: CreateLeadInput) => {
+      // Use mutation with automatic retry logic (exponential backoff, max 4 attempts)
+      // This prevents orphaned leads when card creation fails
+      const result = await createLeadWithCardRetry(newLead);
+      return result;
     },
     onSuccess: () => {
-      // Invalidate the leads query to refetch
+      // Invalidate the leads query to refetch with new data
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["cards"] });
     },
+    // Error handling is done in the component via mutation.error
+    // The mutation will throw after all retries are exhausted
   });
 
   return {
@@ -55,5 +48,6 @@ export const useLeads = () => {
     error,
     createLead: createLeadMutation.mutate,
     isCreatingLead: createLeadMutation.isPending,
+    createLeadError: createLeadMutation.error,
   };
 };
