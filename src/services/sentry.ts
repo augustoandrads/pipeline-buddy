@@ -51,7 +51,7 @@ export function initializeSentry() {
       if (event.breadcrumbs) {
         event.breadcrumbs = event.breadcrumbs.map((crumb) => {
           if (crumb.message) {
-            crumb.message = crumb.message.replace(/[\w\.-]+@[\w\.-]+\.\w+/g, '[email]');
+            crumb.message = crumb.message.replace(/[\w.-]+@[\w.-]+\.\w+/g, '[email]');
           }
           return crumb;
         });
@@ -86,7 +86,7 @@ export function initializeSentry() {
  */
 export function captureException(
   error: Error | string,
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ) {
   Sentry.withScope((scope) => {
     if (context) {
@@ -129,7 +129,7 @@ export function clearUserContext() {
 /**
  * Add custom context to error reports
  */
-export function addContext(name: string, data: Record<string, any>) {
+export function addContext(name: string, data: Record<string, unknown>) {
   Sentry.setContext(name, data);
 }
 

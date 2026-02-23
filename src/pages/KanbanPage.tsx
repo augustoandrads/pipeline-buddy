@@ -63,12 +63,42 @@ export default function KanbanPage() {
         .insert({ card_id: cardId, etapa_anterior: etapaAnterior, etapa_nova: novaEtapa });
       if (movError) throw movError;
     },
+    onMutate: async ({ cardId, novaEtapa }) => {
+      // Cancel ongoing queries to prevent race conditions
+      await queryClient.cancelQueries({ queryKey: ["cards"] });
+
+      // Get current cache data
+      const previousCards = queryClient.getQueryData<Card[]>(["cards"]);
+
+      if (previousCards) {
+        // Optimistic update: update cache immediately
+        const updatedCards = previousCards.map((c) =>
+          c.id === cardId
+            ? { ...c, etapa: novaEtapa, data_entrada_etapa: new Date().toISOString() }
+            : c
+        );
+        queryClient.setQueryData(["cards"], updatedCards);
+      }
+
+      // Return previous cards for rollback on error
+      return { previousCards };
+    },
     onSuccess: () => {
+      // Refetch to ensure consistency with server
       queryClient.invalidateQueries({ queryKey: ["cards"] });
       toast({ title: "Card movido com sucesso!" });
     },
-    onError: () => {
-      toast({ title: "Erro ao mover card", variant: "destructive" });
+    onError: (error, _, context) => {
+      // Rollback to previous state on error
+      if (context?.previousCards) {
+        queryClient.setQueryData(["cards"], context.previousCards);
+      }
+      const errorMessage = error instanceof Error ? error.message : "Erro ao mover card";
+      toast({
+        title: "Erro ao mover card",
+        description: errorMessage,
+        variant: "destructive"
+      });
     },
   });
 
