@@ -14,30 +14,14 @@ export const useFunnelData = () => {
   return useQuery({
     queryKey: ["funnelData"],
     queryFn: async () => {
-      // Step 1: Count total leads (baseline for REUNIAO_REALIZADA)
-      const { data: leads, error: leadsError } = await supabase
-        .from("leads")
-        .select("id");
+      // Fetch all cards with their current stage
+      const { data: cards, error: cardsError } = await supabase
+        .from("cards")
+        .select("id, etapa");
 
-      if (leadsError) throw leadsError;
-      const totalLeads = leads?.length ?? 0;
+      if (cardsError) throw cardsError;
 
-      // Step 2: For each stage after REUNIAO, count DISTINCT cards that reached it
-      // (via movimentacoes table - how many unique cards advanced to that stage)
-      const { data: movements, error: movementsError } = await supabase
-        .from("movimentacoes")
-        .select("card_id, etapa_nova");
-
-      if (movementsError) throw movementsError;
-
-      // Count distinct card_ids per stage (how many reached each stage)
-      const stageReachedCounts: Record<string, Set<string>> = {};
-      movements?.forEach((m) => {
-        if (!stageReachedCounts[m.etapa_nova]) {
-          stageReachedCounts[m.etapa_nova] = new Set();
-        }
-        stageReachedCounts[m.etapa_nova].add(m.card_id);
-      });
+      const cardsList = cards ?? [];
 
       // Build funnel data
       const funnelData: FunnelData[] = [];
@@ -51,22 +35,40 @@ export const useFunnelData = () => {
         "VENDA_FECHADA",
       ];
 
-      let previousCount = totalLeads; // Start with total leads
+      // Define which stages come AFTER each stage (for funnel calculation)
+      const stageHierarchy: Record<Etapa, Etapa[]> = {
+        "REUNIAO_REALIZADA": [
+          "REUNIAO_REALIZADA",
+          "PROPOSTA_ENVIADA",
+          "EM_NEGOCIACAO",
+          "CONTRATO_GERADO",
+          "VENDA_FECHADA",
+        ],
+        "PROPOSTA_ENVIADA": [
+          "PROPOSTA_ENVIADA",
+          "EM_NEGOCIACAO",
+          "CONTRATO_GERADO",
+          "VENDA_FECHADA",
+        ],
+        "EM_NEGOCIACAO": [
+          "EM_NEGOCIACAO",
+          "CONTRATO_GERADO",
+          "VENDA_FECHADA",
+        ],
+        "CONTRATO_GERADO": ["CONTRATO_GERADO", "VENDA_FECHADA"],
+        "VENDA_FECHADA": ["VENDA_FECHADA"],
+      };
 
-      allStages.forEach((stage, index) => {
-        let count = 0;
-        let conversionRate = 100;
+      let previousCount = cardsList.length; // Total cards as baseline
 
-        if (index === 0) {
-          // First stage: all leads start here
-          count = totalLeads;
-          conversionRate = 100;
-        } else {
-          // Subsequent stages: count distinct cards that reached this stage
-          count = stageReachedCounts[stage]?.size ?? 0;
-          // Conversion rate from previous stage
-          conversionRate = previousCount > 0 ? Math.round((count / previousCount) * 100) : 0;
-        }
+      allStages.forEach((stage) => {
+        // Count cards that are in THIS STAGE or BEYOND (for funnel progression)
+        const count = cardsList.filter((c) =>
+          stageHierarchy[stage].includes(c.etapa as Etapa)
+        ).length;
+
+        // Conversion rate from previous stage
+        const conversionRate = previousCount > 0 ? Math.round((count / previousCount) * 100) : 0;
 
         const etapaConfig = ETAPAS.find((e) => e.key === stage);
 
