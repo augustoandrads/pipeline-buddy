@@ -1,0 +1,588 @@
+# EPICS: Commercial Features v1.0
+# Pipeline Buddy CRM - Estrutura de Desenvolvimento
+
+epics:
+  - epic_id: "EPIC-CF-1"
+    title: "Pipeline Forecasting & Probabilidade de Fechamento"
+    description: |
+      Implementar sistema de scoring de probabilidade em tempo real para cada lead,
+      com dashboard executivo para prever receita e acompanhar velocity do pipeline.
+
+    prd_reference: "docs/PRD-COMMERCIAL-FEATURES-V1.md#-feature-1-pipeline-forecasting"
+    business_value: |
+      - Revenue Accuracy: MAPE < 15% (vs 25-40% atual)
+      - Previsibilidade: Manager consegue prever receita com confiança
+      - Prioritization: Vendedor sabe quais leads focar
+      - Impact: +15-20% revenue via better prioritization
+
+    success_metrics:
+      - metric: "Forecast Accuracy (MAPE)"
+        target: "< 15%"
+        measurement: "Diferença % entre probabilidade_final e 1.0 para vendas fechadas"
+
+      - metric: "Dashboard Load Time"
+        target: "< 2 segundos"
+        measurement: "Performance timeline do carregamento"
+
+      - metric: "User Adoption"
+        target: ">= 80%"
+        measurement: "% de vendedores usando forecasting diariamente"
+
+    scope:
+      in:
+        - Cálculo automático de probabilidade por lead
+        - Dashboard de forecasting executivo
+        - Integração no kanban (mostrar probabilidade em cards)
+        - Histórico de probabilidades (forecasting_history table)
+        - Alertas (leads 30+ dias em etapa)
+        - Relatório de accuracy (histórico vs real)
+        - Triggers automáticos para recálculo
+
+      out:
+        - Integração com sistemas externos (Salesforce, HubSpot)
+        - ML/AI modelo treinado (regras simples por enquanto)
+        - Mobile app nativo
+        - Notificações em tempo real (apenas logs)
+
+    dependencies:
+      - "Database schema + migrations (Wave 1)"
+      - "RLS policies setup (Wave 1)"
+
+    stories:
+      - story_id: "1.1"
+        title: "Schema de Forecasting: Nova tabela forecasting_history + coluna probabilidade"
+        description: |
+          Criar estrutura de dados para armazenar histórico de probabilidades
+          e adicionar coluna probabilidade na tabela cards.
+
+        acceptance_criteria:
+          - "✅ Tabela forecasting_history criada com campos: id, card_id, data_snapshot, probabilidade, valor_provavel, receita_real"
+          - "✅ UNIQUE constraint em (card_id, data_snapshot)"
+          - "✅ Coluna probabilidade adicionada em cards"
+          - "✅ Índices de performance criados"
+          - "✅ Migration pronta para deploy"
+
+        complexity: "story_points: 5"
+        type: "database"
+        assignee: "@data-engineer"
+
+      - story_id: "1.2"
+        title: "Stored Procedure: calculate_probability(card_id)"
+        description: |
+          Implementar função PL/pgSQL que calcula probabilidade de fechamento
+          baseado em: etapa base, tempo na etapa, histórico, origem, tamanho deal.
+
+        acceptance_criteria:
+          - "✅ Função calcula base_etapa corretamente"
+          - "✅ Ajuste de tempo (-2% a cada 10 dias, máx -30%)"
+          - "✅ Ajuste de histórico (velocidade movimento +10%)"
+          - "✅ Ajuste de origem (referência +20%, web -5%)"
+          - "✅ Ajuste de tamanho (<20k -5%, >100k +5%)"
+          - "✅ Resultado clampado entre 0-100"
+          - "✅ Testes com data histórica (5 cenários)"
+
+        complexity: "story_points: 8"
+        type: "backend"
+        assignee: "@data-engineer"
+
+      - story_id: "1.3"
+        title: "Triggers: Recalcular probabilidade quando lead muda etapa"
+        description: |
+          Criar triggers para executar calculate_probability quando:
+          - card.etapa muda
+          - Nightly job (recalc com 24h+ sem update)
+          - Lead fechado (calcular accuracy)
+
+        acceptance_criteria:
+          - "✅ Trigger AFTER UPDATE cards SET etapa executa"
+          - "✅ Nightly job (cron, 02:00 UTC) recalcula leads antigos"
+          - "✅ Ao fechar venda, receita_real registrada em forecasting_history"
+          - "✅ Sem race conditions (leads simultâneos)"
+          - "✅ Performance: trigger < 100ms por update"
+
+        complexity: "story_points: 5"
+        type: "backend"
+        assignee: "@dev"
+
+      - story_id: "1.4"
+        title: "Frontend: Integração kanban - mostrar probabilidade em cards"
+        description: |
+          Adicionar probabilidade visual nos KanbanCards:
+          - Percentual (72%)
+          - Cor (🟢 > 70%, 🟡 40-70%, 🔴 < 40%)
+          - Dias na etapa (⏱️ 15 dias)
+
+        acceptance_criteria:
+          - "✅ Card mostra probabilidade % em verde/amarelo/vermelho"
+          - "✅ Hover mostra breakdown (base: 40%, tempo: -10%, origem: +20%)"
+          - "✅ Atualiza em tempo real quando lead muda etapa"
+          - "✅ Mobile: legível (não quebra layout)"
+          - "✅ Acessibilidade: contraste > 4.5:1"
+
+        complexity: "story_points: 5"
+        type: "frontend"
+        assignee: "@dev"
+
+      - story_id: "1.5"
+        title: "Página: Forecasting Dashboard"
+        description: |
+          Nova página `/forecasting` com KPIs, gráficos, alertas, tabela de leads.
+
+        acceptance_criteria:
+          - "✅ 4 KPI cards carregam (Receita Real, Provável, Accuracy, Prob Média)"
+          - "✅ Gráfico Real vs Provável (últimos 6 meses)"
+          - "✅ Alertas visíveis (5+ leads atrasados, funil -20% vs mês anterior)"
+          - "✅ Tabela com leads filtráveis (HIGH, MED, LOW probability)"
+          - "✅ Histograma de distribuição"
+          - "✅ Forecast 3 meses"
+          - "✅ Mobile responsivo"
+          - "✅ Performance < 2s"
+
+        complexity: "story_points: 13"
+        type: "frontend"
+        assignee: "@dev"
+
+      - story_id: "1.6"
+        title: "Relatório: Accuracy & Pipeline Velocity"
+        description: |
+          Novo relatório mostrando MAPE (forecast accuracy) e velocity por etapa.
+
+        acceptance_criteria:
+          - "✅ Tabela: Leads que fecharam (6 meses) com prob_final vs real"
+          - "✅ MAPE calculado corretamente"
+          - "✅ Gráfico: Tempo médio por etapa (histograma)"
+          - "✅ Alerta se etapa X > 20% mais lenta que histórico"
+          - "✅ Exportável como CSV"
+
+        complexity: "story_points: 8"
+        type: "frontend"
+        assignee: "@dev"
+
+    timeline:
+      wave: 2
+      duration_weeks: 4
+      start_date: "2025-03-03"
+      end_date: "2025-03-31"
+
+  - epic_id: "EPIC-CF-2"
+    title: "Atribuição de Leads + Distribuição Automática"
+    description: |
+      Sistema para atribuir leads a vendedores com 3 modos: Manual, Round-Robin, Smart.
+      Inclui notificações, filtros por vendedor, relatórios de performance individual.
+
+    prd_reference: "docs/PRD-COMMERCIAL-FEATURES-V1.md#-feature-2-atribuição-de-leads"
+    business_value: |
+      - Escalabilidade: Equipe cresce 5x (distribuição automática vs manual)
+      - Onboarding: Novo vendedor produtivo no 1º dia (recebe leads automaticamente)
+      - Fairness: Carga de trabalho equilibrada (smart distribution)
+      - Impact: -40% tempo administrativo
+
+    success_metrics:
+      - metric: "Lead Assignment Time"
+        target: "< 2 minutos para 50 leads"
+        measurement: "Cronômetro em assignment page"
+
+      - metric: "Workload Balance"
+        target: "Desvio padrão de leads < 20%"
+        measurement: "StDev de leads_count por vendedor"
+
+      - metric: "Onboarding Time"
+        target: "-50% (2h → 1h)"
+        measurement: "Tempo para novo vendedor ter 10 leads qualificados"
+
+    scope:
+      in:
+        - Campo vendedor_id em leads table
+        - 3 modos de distribuição (manual, round-robin, smart)
+        - Página /leads/assignment (UI para atribuir)
+        - Filtro "Meus Leads" no Kanban
+        - Notificações "Novo lead atribuído"
+        - Histórico de atribuições (assignment_history table)
+        - Relatórios por vendedor (conversão, tempo médio, pipeline)
+
+      out:
+        - Atribuição por scorecard/AI (future feature)
+        - Reassignments automáticas (já foi com não responde)
+        - Integração com CRM externo
+
+    dependencies:
+      - "EPIC-CF-1 (forecasting) — para smart distribution score"
+      - "Notification system setup"
+      - "Auth + roles (manager, vendedor, admin)"
+
+    stories:
+      - story_id: "2.1"
+        title: "Schema: Campo vendedor_id em leads + assignment_history table"
+        description: |
+          Adicionar FK vendedor_id em leads e criar tabela de auditoria.
+
+        acceptance_criteria:
+          - "✅ Coluna vendedor_id adicionada em leads (FK para auth.users)"
+          - "✅ Coluna atribuido_em adicionada"
+          - "✅ assignment_history table criada com: id, lead_id, vendedor_anterior, vendedor_novo, motivo, atribuido_por, criado_em"
+          - "✅ Índices de performance criados"
+          - "✅ Migration pronta"
+
+        complexity: "story_points: 3"
+        type: "database"
+        assignee: "@data-engineer"
+
+      - story_id: "2.2"
+        title: "Backend: Funções de distribuição (round-robin, smart)"
+        description: |
+          Implementar stored procedures para calcular próximo vendedor.
+
+        acceptance_criteria:
+          - "✅ Função next_in_rotation() retorna próximo vendedor (round-robin)"
+          - "✅ Função calc_best_vendor_for_assignment() implementa smart logic"
+          - "✅ Sem erros quando não há vendedores ativos"
+          - "✅ Testes: distribuir 100 leads → verificar balance"
+          - "✅ Performance < 50ms por distribuição"
+
+        complexity: "story_points: 8"
+        type: "backend"
+        assignee: "@data-engineer"
+
+      - story_id: "2.3"
+        title: "Frontend: Página /leads/assignment"
+        description: |
+          Interface para visualizar vendedores, leads não atribuídos, e realizar atribuição.
+
+        acceptance_criteria:
+          - "✅ Coluna esquerda: Lista de vendedores (nome, leads_count, performance, pipeline)"
+          - "✅ Coluna direita: Leads não atribuídos (tabela com nome, valor, ações)"
+          - "✅ Dropdown para atribuir lead a vendedor específico"
+          - "✅ Botão [🔄 Auto-Distribuir] com modal (modo: round-robin/smart)"
+          - "✅ Confirmação antes de distribuir"
+          - "✅ Feedback visual (X leads distribuídos em Ys)"
+          - "✅ Mobile responsivo"
+          - "✅ Performance < 2s"
+
+        complexity: "story_points: 13"
+        type: "frontend"
+        assignee: "@dev"
+
+      - story_id: "2.4"
+        title: "Frontend: Filtro 'Meus Leads' no Kanban"
+        description: |
+          Adicionar checkbox no LeadFilter para mostrar apenas leads do vendedor logado.
+
+        acceptance_criteria:
+          - "✅ Checkbox [👤 Meus Leads] no filtro"
+          - "✅ Quando ativado, kanban mostra apenas cards onde lead.vendedor_id == current_user.id"
+          - "✅ Filtro persiste em localStorage"
+          - "✅ Atualiza em tempo real quando novo lead atribuído"
+
+        complexity: "story_points: 3"
+        type: "frontend"
+        assignee: "@dev"
+
+      - story_id: "2.5"
+        title: "Notificações: Sistema de alertas para novo lead atribuído"
+        description: |
+          Criar tabela notifications + trigger para notificar vendedor quando lead atribuído.
+
+        acceptance_criteria:
+          - "✅ Tabela notifications criada"
+          - "✅ Trigger: AFTER UPDATE leads SET vendedor_id → criar notification"
+          - "✅ Toast aparece em tempo real (se online)"
+          - "✅ Email enviado (template)"
+          - "✅ Notificação marca como lida quando clicada"
+          - "✅ Histórico de notificações acessível"
+
+        complexity: "story_points: 8"
+        type: "backend"
+        assignee: "@dev"
+
+      - story_id: "2.6"
+        title: "Relatórios: Performance por Vendedor"
+        description: |
+          Nova página `/relatorios/vendedores` com cards individuais.
+
+        acceptance_criteria:
+          - "✅ Card por vendedor: nome, leads_count, taxa_conversão, valor_médio, tempo_médio, pipeline_total, vendas_fechadas_mês"
+          - "✅ Gráfico: Leads por etapa (este vendedor)"
+          - "✅ Gráfico: Performance vs Média da Equipe"
+          - "✅ Período selecionável (mês, trimestre, ano)"
+          - "✅ Exportável como CSV"
+          - "✅ Mobile responsivo"
+
+        complexity: "story_points: 10"
+        type: "frontend"
+        assignee: "@dev"
+
+    timeline:
+      wave: 2
+      duration_weeks: 4
+      start_date: "2025-03-03"
+      end_date: "2025-03-31"
+
+  - epic_id: "EPIC-CF-3"
+    title: "Histórico de Negociação + Sistema de Notas"
+    description: |
+      Sistema unificado de notas/anotações com 3 níveis de visibilidade (pública, privada, interna),
+      timeline visual, @mentions, tags, anexos, busca e exportação de histórico.
+
+    prd_reference: "docs/PRD-COMMERCIAL-FEATURES-V1.md#-feature-3-histórico-de-negociação"
+    business_value: |
+      - Context Sharing: Handoff 100% mais rápido (contexto completo acessível)
+      - Compliance: Auditoria completa (quem falou o quê e quando)
+      - Knowledge Sharing: Equipe aprende com histórico de negociações bem-sucedidas
+      - Impact: -30% tempo de onboarding, +20% deal retention
+
+    success_metrics:
+      - metric: "Handoff Success Rate"
+        target: ">= 90%"
+        measurement: "% de vendas que não perdida após handoff"
+
+      - metric: "Notes per Lead"
+        target: ">= 3 notas"
+        measurement: "Média de anotações por lead no pipeline"
+
+      - metric: "Team Knowledge Base"
+        target: ">= 80% leads com histórico"
+        measurement: "% de leads com >= 2 notas públicas"
+
+    scope:
+      in:
+        - Tabela anotacoes com 3 tipos (pública, privada, interna)
+        - Rich editor com markdown + @mentions
+        - Timeline visual (sidebar no kanban)
+        - Tags para categorizar (#desconto, #follow-up, #urgente)
+        - Anexos (files + URLs)
+        - RLS policies (quem vê o quê)
+        - Busca no histórico
+        - Exportação para PDF
+        - Notificações de @mentions
+
+      out:
+        - AI summarization de notas
+        - Integração com email/Slack
+        - Voice recording integrado
+
+    dependencies:
+      - "Rich text editor library (prosemirror ou slate)"
+      - "S3/Storage para attachments (se não for só links)"
+      - "RLS policies validation"
+
+    stories:
+      - story_id: "3.1"
+        title: "Schema: Tabelas anotacoes, anotacao_mentions, anotacao_anexos, anotacao_tags"
+        description: |
+          Criar estrutura para armazenar notas com relacionamentos.
+
+        acceptance_criteria:
+          - "✅ Tabela anotacoes: id, lead_id, autor_id, tipo (enum), conteudo, conteudo_html, criado_em, atualizado_em, deleted_at"
+          - "✅ Tabela anotacao_mentions: id, anotacao_id, usuario_mencionado_id"
+          - "✅ Tabela anotacao_anexos: id, anotacao_id, tipo (file/link), url, nome_arquivo, tamanho_bytes"
+          - "✅ Tabela anotacao_tags: id, anotacao_id, tag"
+          - "✅ Índices de performance"
+          - "✅ Soft delete support (deleted_at)"
+          - "✅ Migration pronta"
+
+        complexity: "story_points: 5"
+        type: "database"
+        assignee: "@data-engineer"
+
+      - story_id: "3.2"
+        title: "RLS Policies: Controle de acesso para anotacoes"
+        description: |
+          Implementar policies: pública (todos), privada (autor+manager), interna (manager).
+
+        acceptance_criteria:
+          - "✅ Policy SELECT: tipo='pública' → todos veem"
+          - "✅ Policy SELECT: tipo='privada' → autor + manager veem"
+          - "✅ Policy SELECT: tipo='interna' → manager só"
+          - "✅ Policy INSERT: só autor pode criar"
+          - "✅ Policy DELETE: autor ou manager"
+          - "✅ Testes com 3 usuários (vendedor, manager, admin)"
+          - "✅ Sem data leaks"
+
+        complexity: "story_points: 8"
+        type: "backend"
+        assignee: "@architect"
+
+      - story_id: "3.3"
+        title: "Frontend: Rich Editor + Modal de Criar Nota"
+        description: |
+          Componente para escrever notas com markdown, @mentions, tags, anexos.
+
+        acceptance_criteria:
+          - "✅ Modal com 3 campos: Tipo (dropdown), Conteúdo (rich editor), Cc (@mentions)"
+          - "✅ Markdown preview (live)"
+          - "✅ Autocomplete para @mentions (lista de usuários)"
+          - "✅ Tags com autocomplete"
+          - "✅ Botão [📎 Anexar arquivo] (drag-drop ou file picker)"
+          - "✅ Botão [🔗 Anexar link]"
+          - "✅ Validação: conteúdo não vazio"
+          - "✅ Mobile responsivo"
+
+        complexity: "story_points: 13"
+        type: "frontend"
+        assignee: "@dev"
+
+      - story_id: "3.4"
+        title: "Frontend: Timeline de Histórico (sidebar)"
+        description: |
+          Componente NotesSidebar mostrando histórico cronológico do lead.
+
+        acceptance_criteria:
+          - "✅ Timeline visual (data, hora, autor, tipo de evento)"
+          - "✅ Mostra: notas (públicas/privadas conforme acesso), movimentações, eventos do sistema"
+          - "✅ Scroll infinito ou paginação"
+          - "✅ Filtros: Apenas notas, Apenas movimentações, Data range"
+          - "✅ Performance: carrega primeiras 50 itens < 500ms"
+          - "✅ Mobile: timeline scrollable verticalmente"
+
+        complexity: "story_points: 10"
+        type: "frontend"
+        assignee: "@dev"
+
+      - story_id: "3.5"
+        title: "Backend: Busca em anotacoes (full-text search)"
+        description: |
+          Implementar função de busca em conteúdo de notas.
+
+        acceptance_criteria:
+          - "✅ Função search_anotacoes(lead_id, query) retorna matches ordenados por relevância"
+          - "✅ Busca em conteudo_html (renderizado)"
+          - "✅ Respeita RLS (não retorna notas que user não pode ver)"
+          - "✅ Performance < 200ms para 500 notas"
+          - "✅ Testes: buscar 'cliente', 'desconto', 'follow-up'"
+
+        complexity: "story_points: 5"
+        type: "backend"
+        assignee: "@data-engineer"
+
+      - story_id: "3.6"
+        title: "Notificações: @mentions alertam usuários"
+        description: |
+          Trigger para notificar quando alguém menciona você (@seu_nome).
+
+        acceptance_criteria:
+          - "✅ Trigger: AFTER INSERT anotacoes_mentions → notificação criada"
+          - "✅ Toast em tempo real (se online)"
+          - "✅ Email enviado (template com contexto)"
+          - "✅ Link para ir direto na nota"
+          - "✅ Notificação marca como lida quando clicada"
+
+        complexity: "story_points: 5"
+        type: "backend"
+        assignee: "@dev"
+
+      - story_id: "3.7"
+        title: "Exportação: Gerar PDF de histórico completo"
+        description: |
+          Botão que exporta histórico do lead para PDF (incluindo timeline, excluindo notas internas).
+
+        acceptance_criteria:
+          - "✅ Botão [📥 Exportar Histórico] no sidebar"
+          - "✅ PDF com: cabeçalho (lead, período), timeline, footer (data de export)"
+          - "✅ Inclui notas públicas + movimentações"
+          - "✅ Exclui notas privadas/internas"
+          - "✅ Formatação legível (fonte, spacing)"
+          - "✅ Mobile: gera PDF válido"
+          - "✅ Performance < 2s para 100 eventos"
+
+        complexity: "story_points: 8"
+        type: "frontend"
+        assignee: "@dev"
+
+    timeline:
+      wave: 3
+      duration_weeks: 3
+      start_date: "2025-04-01"
+      end_date: "2025-04-21"
+
+# Infrastructure & Setup Epic
+setup_epic:
+  epic_id: "EPIC-CF-0"
+  title: "Setup: Infrastructure & Foundation"
+  description: |
+    Tasks de infraestrutura compartilhadas por todas as features:
+    - Database migrations, triggers, indexes
+    - Auth + RLS policies
+    - Notification system
+    - Monitoring + error tracking
+
+  stories:
+    - story_id: "0.1"
+      title: "Database: Criar migrations master + indexing strategy"
+      complexity: "story_points: 8"
+      type: "database"
+      assignee: "@data-engineer"
+
+    - story_id: "0.2"
+      title: "Auth: Validar roles + RLS policies base"
+      complexity: "story_points: 5"
+      type: "backend"
+      assignee: "@architect"
+
+    - story_id: "0.3"
+      title: "Notifications: Setup sistema (toast + email)"
+      complexity: "story_points: 13"
+      type: "backend"
+      assignee: "@dev"
+
+    - story_id: "0.4"
+      title: "Monitoring: Setup Sentry + error tracking"
+      complexity: "story_points: 5"
+      type: "devops"
+      assignee: "@devops"
+
+  timeline:
+    wave: 1
+    duration_weeks: 2
+    start_date: "2025-02-24"
+    end_date: "2025-03-03"
+
+# Execution Plan
+execution_plan:
+  approach: "Wave-based parallel development"
+  waves:
+    - wave_num: 1
+      name: "Foundation"
+      duration_weeks: 2
+      epics: ["EPIC-CF-0"]
+      parallel_tracks: 1
+      start_date: "2025-02-24"
+
+    - wave_num: 2
+      name: "Core Features (Forecasting + Assignment)"
+      duration_weeks: 4
+      epics: ["EPIC-CF-1", "EPIC-CF-2"]
+      parallel_tracks: 2
+      start_date: "2025-03-03"
+
+    - wave_num: 3
+      name: "Notes System"
+      duration_weeks: 3
+      epics: ["EPIC-CF-3"]
+      parallel_tracks: 1
+      start_date: "2025-04-01"
+
+    - wave_num: 4
+      name: "Polish + Launch"
+      duration_weeks: 2
+      epics: []
+      activities:
+        - "Mobile optimization"
+        - "Accessibility audit"
+        - "Performance optimization"
+        - "User testing"
+        - "Documentation"
+      parallel_tracks: 1
+      start_date: "2025-04-21"
+
+  total_weeks: 11
+  total_story_points: 187
+  recommended_team_size: "2-3 devs"
+
+  critical_path:
+    1: "EPIC-CF-0 (Foundation) → all else depends"
+    2: "EPIC-CF-1.2 (calculate_probability SP) → EPIC-CF-2.2 (smart distribution)"
+    3: "All frontend features parallelizáveis após backend ready"
+
+status: "DRAFT"
+created_date: "2025-02-22"
+next_action: "@po *validate-story-draft on this epic structure"

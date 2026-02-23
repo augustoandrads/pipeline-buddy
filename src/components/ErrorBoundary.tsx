@@ -1,59 +1,77 @@
-import React, { ReactNode } from "react";
-import { AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+/**
+ * ErrorBoundary Component
+ * Catches React component errors and reports to Sentry
+ */
 
-interface ErrorBoundaryProps {
-  children: ReactNode;
+import React from 'react';
+import * as Sentry from '@sentry/react';
+
+interface Props {
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
 }
 
-interface ErrorBoundaryState {
+interface State {
   hasError: boolean;
-  error: Error | null;
+  error?: Error;
 }
 
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
+class ErrorBoundary extends React.Component<Props, State> {
+  constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("Error caught by boundary:", error, errorInfo);
+    // Log error info to Sentry
+    Sentry.captureException(error, {
+      contexts: {
+        react: {
+          componentStack: errorInfo.componentStack,
+        },
+      },
+    });
+
+    console.error('Error caught by boundary:', error, errorInfo);
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null });
-    window.location.reload();
+    this.setState({ hasError: false, error: undefined });
   };
 
   render() {
     if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+
       return (
-        <div className="flex h-screen flex-col items-center justify-center gap-4 p-6">
-          <div className="flex flex-col items-center gap-4">
-            <AlertTriangle className="h-12 w-12 text-destructive" />
-            <div className="text-center">
-              <h1 className="text-2xl font-semibold">Algo deu errado</h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Desculpe, encontramos um erro inesperado. Tente recarregar a página.
-              </p>
-              {process.env.NODE_ENV === "development" && this.state.error && (
-                <details className="mt-4 text-xs text-muted-foreground">
-                  <summary className="cursor-pointer font-medium">Detalhes do erro</summary>
-                  <pre className="mt-2 rounded bg-muted p-2 overflow-auto max-w-md">
-                    {this.state.error.message}
-                  </pre>
-                </details>
-              )}
-            </div>
-            <Button onClick={this.handleReset} className="gap-2">
-              Recarregar página
-            </Button>
-          </div>
+        <div
+          style={{
+            padding: '20px',
+            backgroundColor: '#f8d7da',
+            border: '1px solid #f5c6cb',
+            borderRadius: '4px',
+            color: '#721c24',
+          }}
+        >
+          <h2>Oops! Something went wrong.</h2>
+          <p>We've been notified about this error. Please try refreshing the page.</p>
+          {process.env.NODE_ENV === 'development' && (
+            <details style={{ marginTop: '10px', color: '#000' }}>
+              <summary>Error Details (dev only)</summary>
+              <pre style={{ overflow: 'auto', fontSize: '12px' }}>
+                {this.state.error?.toString()}
+              </pre>
+            </details>
+          )}
+          <button onClick={this.handleReset} style={{ marginTop: '10px' }}>
+            Try Again
+          </button>
         </div>
       );
     }
@@ -61,3 +79,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     return this.props.children;
   }
 }
+
+// Export wrapped with Sentry
+export default Sentry.withErrorBoundary(ErrorBoundary, {
+  fallback: <h2>An error has occurred</h2>,
+  showDialog: false,
+});
