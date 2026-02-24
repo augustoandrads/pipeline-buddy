@@ -23,6 +23,35 @@ export class AttachmentValidationError extends Error {
 }
 
 /**
+ * Sanitize filename for Supabase Storage
+ * Removes/replaces special characters that are invalid in storage keys
+ */
+function sanitizeFilename(filename: string): string {
+  // Get extension
+  const lastDotIndex = filename.lastIndexOf(".");
+  const name = filename.substring(0, lastDotIndex);
+  const ext = filename.substring(lastDotIndex);
+
+  // Replace problematic characters
+  // Allow: letters, numbers, hyphens, underscores
+  // Replace: spaces with underscore, remove other special chars
+  const sanitized = name
+    .toLowerCase()
+    .replace(/[\s]+/g, "_") // Multiple spaces to single underscore
+    .replace(/[àáâãäå]/g, "a")
+    .replace(/[èéêë]/g, "e")
+    .replace(/[ìíîï]/g, "i")
+    .replace(/[òóôõö]/g, "o")
+    .replace(/[ùúûü]/g, "u")
+    .replace(/[ç]/g, "c")
+    .replace(/[^a-z0-9-_]/g, "") // Remove all other special chars
+    .replace(/[-_]+/g, "_") // Consolidate multiple underscores/hyphens
+    .substring(0, 200); // Limit length
+
+  return sanitized + ext;
+}
+
+/**
  * Validate file before upload
  * Checks size and MIME type against allowed values
  */
@@ -84,7 +113,8 @@ export async function uploadAttachment(
 
     // Generate unique storage path to prevent collisions
     const uniqueId = crypto.randomUUID();
-    const storagePath = `${leadId}/${uniqueId}-${file.name}`;
+    const sanitizedFilename = sanitizeFilename(file.name);
+    const storagePath = `${leadId}/${uniqueId}-${sanitizedFilename}`;
 
     // Upload file to Supabase Storage
     const { error: uploadError } = await supabase.storage
