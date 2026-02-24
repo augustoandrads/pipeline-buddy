@@ -7,7 +7,7 @@ import {
   SheetHeader,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { LayoutDashboard, Users, BarChart3, TrendingUp, Menu, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, Users, BarChart3, TrendingUp, Menu, AlertTriangle, TrendingDown, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
@@ -15,6 +15,8 @@ const navItems = [
   { to: "/leads", label: "Leads", icon: Users },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
   { to: "/leads-em-risco", label: "Leads em Risco", icon: AlertTriangle },
+  { to: "/motivos-perda", label: "Motivos de Perda", icon: TrendingDown },
+  { to: "/meu-dia", label: "Meu Dia", icon: CheckSquare },
 ];
 
 /**

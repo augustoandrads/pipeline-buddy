@@ -9,6 +9,8 @@ import KanbanPage from "./pages/KanbanPage";
 import LeadsPage from "./pages/LeadsPage";
 import RelatoriosPage from "./pages/RelatoriosPage";
 import AtRiskLeadsPage from "./pages/AtRiskLeadsPage";
+import { LossReportPage } from "./pages/LossReportPage";
+import { MyDayPage } from "./pages/MyDayPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +36,8 @@ const App = () => (
                 <Route path="/leads" element={<LeadsPage />} />
                 <Route path="/relatorios" element={<RelatoriosPage />} />
                 <Route path="/leads-em-risco" element={<AtRiskLeadsPage />} />
+                <Route path="/motivos-perda" element={<LossReportPage />} />
+                <Route path="/meu-dia" element={<MyDayPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>

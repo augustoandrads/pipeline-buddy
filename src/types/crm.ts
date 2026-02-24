@@ -5,7 +5,14 @@ export type Etapa =
   | 'PROPOSTA_ENVIADA'
   | 'EM_NEGOCIACAO'
   | 'CONTRATO_GERADO'
-  | 'VENDA_FECHADA';
+  | 'VENDA_FECHADA'
+  | 'PERDIDO';
+
+export type LossReason = 'PRICE' | 'COMPETITOR' | 'NO_URGENCY' | 'NO_RESPONSE' | 'WRONG_PROFILE' | 'OTHER';
+
+export type TaskType = 'CALL' | 'MESSAGE' | 'MEETING' | 'EMAIL' | 'OTHER';
+
+export type TaskStatus = 'PENDING' | 'COMPLETED' | 'OVERDUE';
 
 export interface Lead {
   id: string;
@@ -38,13 +45,52 @@ export interface Movimentacao {
   criado_em: string;
 }
 
+export interface LeadLoss {
+  id: string;
+  lead_id: string;
+  reason: LossReason;
+  other_details?: string;
+  criado_em: string;
+}
+
+export interface Task {
+  id: string;
+  lead_id: string;
+  title: string;
+  type: TaskType;
+  due_date: string;
+  assignee?: string;
+  status: TaskStatus;
+  result?: string;
+  criado_em: string;
+  updated_at: string;
+}
+
 export const ETAPAS: { key: Etapa; label: string; color: string }[] = [
   { key: 'REUNIAO_REALIZADA', label: 'Reunião Realizada', color: 'etapa-reuniao' },
   { key: 'PROPOSTA_ENVIADA', label: 'Proposta Enviada', color: 'etapa-proposta' },
   { key: 'EM_NEGOCIACAO', label: 'Em Negociação', color: 'etapa-negociacao' },
   { key: 'CONTRATO_GERADO', label: 'Contrato Gerado', color: 'etapa-contrato' },
   { key: 'VENDA_FECHADA', label: 'Venda Fechada', color: 'etapa-venda' },
+  { key: 'PERDIDO', label: 'Perdido', color: 'etapa-perdido' },
 ];
+
+export const LOSS_REASON_LABELS: Record<LossReason, string> = {
+  PRICE: 'Preço',
+  COMPETITOR: 'Concorrente',
+  NO_URGENCY: 'Sem urgência',
+  NO_RESPONSE: 'Sem resposta',
+  WRONG_PROFILE: 'Perfil não adequado',
+  OTHER: 'Outro',
+};
+
+export const TASK_TYPE_LABELS: Record<TaskType, string> = {
+  CALL: 'Ligação',
+  MESSAGE: 'Mensagem',
+  MEETING: 'Reunião',
+  EMAIL: 'E-mail',
+  OTHER: 'Outro',
+};
 
 export const TIPO_CLIENTE_LABELS: Record<TipoCliente, string> = {
   IMOBILIARIA: 'Imobiliária',

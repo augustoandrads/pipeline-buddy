@@ -12,12 +12,14 @@ import {
 } from "@dnd-kit/core";
 import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, Etapa, ETAPAS, Lead } from "@/types/crm";
+import { Card, Etapa, ETAPAS, Lead, LossReason } from "@/types/crm";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCard } from "@/components/KanbanCard";
 import { KanbanSkeleton } from "@/components/KanbanSkeleton";
 import { LeadDetailsSidebar } from "@/components/LeadDetailsSidebar";
 import { LeadFilter, LeadFilters } from "@/components/LeadFilter";
+import { LossReasonModal } from "@/components/LossReasonModal";
+import { recordLeadLoss } from "@/services/lossReasonService";
 import { useToast } from "@/hooks/use-toast";
 
 export default function KanbanPage() {
@@ -32,6 +34,8 @@ export default function KanbanPage() {
     tipos: [],
     valueRange: [0, 1000000],
   });
+  const [lossModalOpen, setLossModalOpen] = useState(false);
+  const [pendingCardMove, setPendingCardMove] = useState<{ cardId: string; card: Card; novaEtapa: Etapa; etapaAnterior: Etapa } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -118,7 +122,13 @@ export default function KanbanPage() {
     const novaEtapa = over.id as Etapa;
     if (novaEtapa === card.etapa) return;
 
-    moveCard.mutate({ cardId: card.id, novaEtapa, etapaAnterior: card.etapa });
+    // If moving to PERDIDO, show loss reason modal
+    if (novaEtapa === 'PERDIDO') {
+      setPendingCardMove({ cardId: card.id, card, novaEtapa, etapaAnterior: card.etapa });
+      setLossModalOpen(true);
+    } else {
+      moveCard.mutate({ cardId: card.id, novaEtapa, etapaAnterior: card.etapa });
+    }
   };
 
   const filteredCards = useMemo(() => {
@@ -153,6 +163,38 @@ export default function KanbanPage() {
       setSelectedLead(lead);
       setSelectedCard(card || null);
       setIsSidebarOpen(true);
+    }
+  };
+
+  const handleLossReasonConfirm = async (reason: LossReason, otherDetails?: string) => {
+    if (!pendingCardMove) return;
+
+    try {
+      // Record loss reason
+      await recordLeadLoss(
+        pendingCardMove.card.lead_id,
+        pendingCardMove.cardId,
+        reason,
+        otherDetails
+      );
+
+      // Then move the card to PERDIDO
+      moveCard.mutate({
+        cardId: pendingCardMove.cardId,
+        novaEtapa: pendingCardMove.novaEtapa,
+        etapaAnterior: pendingCardMove.etapaAnterior,
+      });
+
+      setLossModalOpen(false);
+      setPendingCardMove(null);
+      toast({ title: "Lead marcado como perdido e motivo registrado!" });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Erro ao registrar perda";
+      toast({
+        title: "Erro",
+        description: errorMessage,
+        variant: "destructive",
+      });
     }
   };
 
@@ -221,6 +263,14 @@ export default function KanbanPage() {
         card={selectedCard}
         open={isSidebarOpen}
         onOpenChange={setIsSidebarOpen}
+      />
+
+      {/* Loss Reason Modal */}
+      <LossReasonModal
+        open={lossModalOpen}
+        onOpenChange={setLossModalOpen}
+        onConfirm={handleLossReasonConfirm}
+        leadName={pendingCardMove?.card.leads?.nome}
       />
     </div>
   );

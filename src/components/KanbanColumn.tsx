@@ -15,6 +15,7 @@ const ETAPA_COLORS: Record<string, string> = {
   EM_NEGOCIACAO: "border-t-[hsl(var(--etapa-negociacao))]",
   CONTRATO_GERADO: "border-t-[hsl(var(--etapa-contrato))]",
   VENDA_FECHADA: "border-t-[hsl(var(--etapa-venda))]",
+  PERDIDO: "border-t-red-500",
 };
 
 const BADGE_COLORS: Record<string, string> = {
@@ -23,6 +24,7 @@ const BADGE_COLORS: Record<string, string> = {
   EM_NEGOCIACAO: "bg-[hsl(var(--etapa-negociacao)/0.1)] text-[hsl(var(--etapa-negociacao))]",
   CONTRATO_GERADO: "bg-[hsl(var(--etapa-contrato)/0.1)] text-[hsl(var(--etapa-contrato))]",
   VENDA_FECHADA: "bg-[hsl(var(--etapa-venda)/0.1)] text-[hsl(var(--etapa-venda))]",
+  PERDIDO: "bg-red-100 text-red-700",
 };
 
 export function KanbanColumn({ etapa, cards, onCardClick }: KanbanColumnProps) {
