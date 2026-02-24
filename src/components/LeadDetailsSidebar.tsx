@@ -19,6 +19,7 @@ import { EditLeadModal } from "@/components/EditLeadModal";
 import { MoveCardModal } from "@/components/MoveCardModal";
 import { LeadExportButton } from "@/components/LeadExportButton";
 import { TasksTab } from "@/components/TasksTab";
+import { AttachmentsTab } from "@/components/AttachmentsTab";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -239,6 +240,14 @@ export function LeadDetailsSidebar({ lead, card, open, onOpenChange }: LeadDetai
                   Tarefas
                 </h3>
                 <TasksTab leadId={lead.id} />
+              </div>
+
+              {/* Attachments */}
+              <div className="space-y-3 border-t pt-4">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  Anexos
+                </h3>
+                <AttachmentsTab leadId={lead.id} />
               </div>
 
               {/* Actions */}

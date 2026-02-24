@@ -97,3 +97,46 @@ export const TIPO_CLIENTE_LABELS: Record<TipoCliente, string> = {
   CONSTRUTORA: 'Construtora',
   CORRETOR: 'Corretor Autônomo',
 };
+
+export type AttachmentMimeType =
+  | 'application/pdf'
+  | 'image/jpeg'
+  | 'image/png'
+  | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  | 'application/msword'
+  | 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  | 'application/vnd.ms-excel';
+
+export interface LeadAttachment {
+  id: string;
+  lead_id: string;
+  file_name: string;
+  file_size: number;
+  mime_type: AttachmentMimeType;
+  storage_path: string;
+  uploaded_by?: string;
+  criado_em: string;
+}
+
+export const ATTACHMENT_MIME_TYPE_LABELS: Record<AttachmentMimeType, string> = {
+  'application/pdf': 'PDF',
+  'image/jpeg': 'JPEG',
+  'image/png': 'PNG',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word',
+  'application/msword': 'Word',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel',
+  'application/vnd.ms-excel': 'Excel',
+};
+
+// File upload validation constants
+export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB in bytes
+export const MAX_ATTACHMENTS_PER_LEAD = 5;
+export const ALLOWED_MIME_TYPES: AttachmentMimeType[] = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+];
