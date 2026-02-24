@@ -126,10 +126,17 @@ export async function uploadAttachment(
 
     if (uploadError) throw uploadError;
 
-    // Get current user for audit trail
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // Get current user for audit trail (optional - may be null if not authenticated)
+    let userId: string | null = null;
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      userId = user?.id || null;
+    } catch (error) {
+      // User not authenticated, continue without user ID
+      console.debug("No authenticated user for audit trail");
+    }
 
     // Create database record with file metadata
     const { data, error: dbError } = await supabase
@@ -140,7 +147,7 @@ export async function uploadAttachment(
         file_size: file.size,
         mime_type: file.type,
         storage_path: storagePath,
-        uploaded_by: user?.id || null,
+        uploaded_by: userId,
       })
       .select()
       .single();
