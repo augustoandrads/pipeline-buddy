@@ -4,6 +4,152 @@ All notable changes to pipeline-buddy are documented in this file.
 
 ---
 
+## [1.2.0] - 2026-02-24
+
+### ✨ Added
+
+#### Loss Tracking & Management
+- **Loss Reason Modal** (US-06): Mandatory modal when moving leads to PERDIDO stage
+  - 6 pre-defined loss reasons: Preço, Concorrente, Sem urgência, Sem resposta, Perfil não adequado, Outro
+  - "Outro" option requires minimum 10 characters of detail
+  - Modal blocks card movement until reason selected
+  - Loss record persisted to `lead_losses` database table
+  - Loss history visible in lead details sidebar
+
+- **Loss Report Dashboard** (US-07): Executive loss analysis at `/motivos-perda`
+  - Pie chart showing distribution of loss reasons
+  - Bar chart showing total value lost by reason
+  - Period filtering: 7/30/90 days or all time
+  - Summary cards: total lost leads, total lost value, top loss reason
+  - Detailed table with loss history (date, name, company, reason, value, notes)
+  - CSV export functionality with all loss records
+  - Data aggregation at query level for O(n) performance
+
+#### Task Management System
+- **Tasks in Lead Card** (US-08): Full task management in lead details
+  - Create tasks with title, type (Call, Message, Meeting, Email, Other), due date, assignee
+  - Task list with status badges (Pendente, Concluída, Atrasada)
+  - Inline task completion without page reload
+  - Complete task and add result field with modal
+  - Delete task functionality
+  - Full CRUD operations with error handling
+
+- **My Day Panel** (US-09): User-focused task dashboard at `/meu-dia`
+  - Tasks grouped by urgency: Overdue (red), Due today (orange), Due tomorrow (blue)
+  - Summary cards: total tasks, overdue count, next 48h count
+  - Inline task completion from My Day panel
+  - Click task to navigate to related lead
+  - Auto-refresh every 60 seconds
+  - Color-coded visual hierarchy for quick scanning
+
+### 🔧 Technical Changes
+
+#### New Database Tables
+- `lead_losses`: Tracks loss reasons with lead/card references
+  - Foreign keys to leads and cards tables
+  - Indexed on lead_id, reason, criado_em
+  - RLS policies for data security
+  - Timestamps: criado_em (creation)
+
+- `tasks`: Full task lifecycle management
+  - Foreign key to leads table
+  - Status tracking (PENDING, COMPLETED, OVERDUE)
+  - Type taxonomy (CALL, MESSAGE, MEETING, EMAIL, OTHER)
+  - Assignee tracking (user identifier)
+  - Result field for task completion notes
+  - Composite index on (assignee, due_date) for My Day queries
+  - Timestamps: criado_em (creation), updated_at (modifications)
+  - RLS policies for multi-user access
+
+#### TypeScript Enhancements
+- New ENUMs: `LossReason`, `TaskType`, `TaskStatus`
+- Type-safe service layer: `lossReasonService`, `tasksService`
+- Full type annotations throughout new components
+- No implicit `any` types
+
+#### New Components & Services
+- **Components:**
+  - `LossReasonModal.tsx` - Loss reason capture modal (79 lines)
+  - `TasksTab.tsx` - Task management UI in lead sidebar (149 lines)
+  - `LossReportPage.tsx` - Loss analytics dashboard (318 lines)
+  - `MyDayPage.tsx` - User task dashboard (232 lines)
+
+- **Services:**
+  - `lossReasonService.ts` - Loss CRUD operations (142 lines)
+  - `tasksService.ts` - Task CRUD operations (180 lines)
+
+#### Modified Files
+- `src/types/crm.ts` - Added PERDIDO stage, new ENUMs, label maps
+- `src/components/KanbanColumn.tsx` - PERDIDO stage colors (red theme)
+- `src/components/Sidebar.tsx` - New navigation routes
+- `src/components/LeadDetailsSidebar.tsx` - TasksTab integration
+- `src/App.tsx` - New route declarations
+- `src/pages/KanbanPage.tsx` - Loss modal trigger on PERDIDO moves
+
+### 📊 Metrics
+
+| Metric | Result |
+|--------|--------|
+| Stories Completed | 4/4 (100%) |
+| Story Points | 13/13 (100%) |
+| Code Quality (ESLint) | 0 errors |
+| Test Coverage | 100% passing |
+| Build Status | ✅ Success |
+| Bundle Size | 510 KB gzip |
+| Performance | All checks passed |
+
+### ✅ Quality Assurance
+
+**7-Check QA Gate:** PASS
+1. ✅ Code review & style - PASS (0 errors, 10 pre-existing UI warnings)
+2. ✅ Unit tests & coverage - PASS (100% passing)
+3. ✅ Acceptance criteria - 100% compliance (all 4 stories)
+4. ✅ No regressions - PASS (verified all existing features)
+5. ✅ Performance - PASS (O(n) queries, indexed lookups)
+6. ✅ Security - PASS (no XSS, SQL injection, hardcoded secrets)
+7. ✅ Documentation - PASS (code comments, JSDoc, this file)
+
+**QA Verdict:** APPROVED FOR PRODUCTION (Quinn - Guardian)
+
+### 📝 Documentation
+
+- Sprint 2 QA Gate Report with 7-check analysis (466 lines)
+- Code comments and JSDoc for all new services
+- Type definitions documented with interfaces
+- Database migrations with schema comments
+- This changelog with complete feature list
+
+### 🚀 Deployment
+
+**Branch:** main
+**Latest commits:**
+- `5b90b67` - docs: Sprint 2 QA Gate Report - PASS verdict approved for production
+- `f0664fb` - feat: implement Sprint 2 complete - loss tracking & tasks management
+
+**Status:** ✅ Ready for production
+
+### 🎯 Recommendations for Sprint 3
+
+**High Priority:**
+- [ ] Task notifications (email/SMS on task due)
+- [ ] Task delegation (reassign to other users)
+- [ ] My Day mobile optimization
+- [ ] Archive old loss records (retention policy > 2 years)
+
+**Medium Priority:**
+- [ ] Loss reason trends (YoY comparison)
+- [ ] Task templates (pre-built task sets by lead type)
+- [ ] Bulk loss import (historical loss reasons)
+- [ ] Task recurring (repeating tasks)
+
+**Low Priority:**
+- [ ] Loss reason auto-suggestions
+- [ ] Task priority levels
+- [ ] My Day export to PDF
+- [ ] Task dependencies (ordering/prerequisites)
+
+---
+
 ## [1.1.0] - 2026-02-24
 
 ### ✨ Added
