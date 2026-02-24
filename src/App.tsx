@@ -8,6 +8,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import KanbanPage from "./pages/KanbanPage";
 import LeadsPage from "./pages/LeadsPage";
 import RelatoriosPage from "./pages/RelatoriosPage";
+import AtRiskLeadsPage from "./pages/AtRiskLeadsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
                 <Route path="/kanban" element={<KanbanPage />} />
                 <Route path="/leads" element={<LeadsPage />} />
                 <Route path="/relatorios" element={<RelatoriosPage />} />
+                <Route path="/leads-em-risco" element={<AtRiskLeadsPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>

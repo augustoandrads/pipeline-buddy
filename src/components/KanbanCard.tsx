@@ -2,8 +2,9 @@ import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Card as CardType, TIPO_CLIENTE_LABELS } from "@/types/crm";
 import { differenceInDays, parseISO } from "date-fns";
-import { Building2, Clock } from "lucide-react";
+import { Building2, Clock, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getInactivityStatus, getThresholdForStage } from "@/hooks/useInactivityThresholds";
 
 interface KanbanCardProps {
   card: CardType;
@@ -20,6 +21,8 @@ export function KanbanCard({ card, isDragging = false, onLeadClick }: KanbanCard
 
   const lead = card.leads;
   const diasNaEtapa = differenceInDays(new Date(), parseISO(card.data_entrada_etapa));
+  const inactivityStatus = getInactivityStatus(card.etapa, diasNaEtapa);
+  const threshold = getThresholdForStage(card.etapa);
 
   return (
     <div
@@ -37,10 +40,13 @@ export function KanbanCard({ card, isDragging = false, onLeadClick }: KanbanCard
         }
       }}
       className={cn(
-        "cursor-grab rounded-lg border bg-card p-3 shadow-sm transition-all select-none",
+        "cursor-grab rounded-lg border bg-card p-3 shadow-sm transition-all select-none border-l-4",
         "hover:shadow-md hover:border-primary/30",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-        isDragging && "cursor-grabbing opacity-80 shadow-xl rotate-1 scale-105"
+        isDragging && "cursor-grabbing opacity-80 shadow-xl rotate-1 scale-105",
+        inactivityStatus === 'perigo' && 'border-l-red-500 bg-red-50/30',
+        inactivityStatus === 'alerta' && 'border-l-yellow-500 bg-yellow-50/30',
+        inactivityStatus === 'normal' && 'border-l-transparent'
       )}
     >
       {/* Lead name */}
@@ -61,13 +67,25 @@ export function KanbanCard({ card, isDragging = false, onLeadClick }: KanbanCard
 
       {/* Footer */}
       <div className="mt-2.5 flex items-center justify-between border-t pt-2">
-        {lead?.valor_estimado_contrato ? (
-          <p className="text-xs font-semibold text-primary">
-            R$ {lead.valor_estimado_contrato.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-          </p>
-        ) : (
-          <span />
-        )}
+        <div className="flex items-center gap-1">
+          {lead?.valor_estimado_contrato ? (
+            <p className="text-xs font-semibold text-primary">
+              R$ {lead.valor_estimado_contrato.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+            </p>
+          ) : (
+            <span className="text-xs text-muted-foreground">Sem valor</span>
+          )}
+          {inactivityStatus && (
+            <div title={`Alerta: Lead parado há ${diasNaEtapa} dias (limite: ${threshold?.diasParaPerigo}d)`}>
+              <AlertCircle
+                className={cn(
+                  "h-3 w-3",
+                  inactivityStatus === 'perigo' ? 'text-red-500' : 'text-yellow-500'
+                )}
+              />
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-1 text-muted-foreground">
           <Clock className="h-3 w-3" />
           <p className="text-xs">{diasNaEtapa}d</p>

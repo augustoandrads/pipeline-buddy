@@ -36,7 +36,11 @@ const formSchema = z.object({
   email: z.string().email("E-mail inválido").min(1, "E-mail é obrigatório"),
   telefone: z.string().min(1, "Telefone é obrigatório"),
   quantidade_imoveis: z.coerce.number().optional(),
-  valor_estimado_contrato: z.coerce.number().min(0.01, "Valor da Negociação é obrigatório"),
+  valor_estimado_contrato: z.coerce.number()
+    .positive("Valor deve ser maior que zero")
+    .refine(val => Number.isFinite(val), "Valor inválido")
+    .optional()
+    .or(z.literal("")),
   origem: z.enum(["INSTAGRAM", "FACEBOOK", "GOOGLE", "YOUTUBE", "LINKEDIN", "ANUNCIOS"], {
     errorMap: () => ({ message: "Origem do Lead é obrigatória" }),
   }),
@@ -188,9 +192,15 @@ export function LeadModal({ open, onClose, onSubmit, isLoading }: LeadModalProps
                 name="valor_estimado_contrato"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Valor da Negociação (R$) *</FormLabel>
+                    <FormLabel>Valor Estimado (R$)</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="5000" {...field} />
+                      <Input
+                        type="number"
+                        placeholder="5000"
+                        min="0"
+                        step="0.01"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
